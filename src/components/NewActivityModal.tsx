@@ -11,6 +11,8 @@ interface NewActivityModalProps {
   selectedProjectId?: string;
 }
 
+
+
 const NewActivityModal: React.FC<NewActivityModalProps> = ({
   isOpen,
   onClose,
