@@ -11,16 +11,18 @@ function ForgotPassword() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
+    setError(''); // Réinitialise les erreurs avant chaque soumission
     setIsLoading(true);
 
     try {
+      // Appel du service de réinitialisation de mot de passe
       await authService.requestPasswordReset(email);
-      setIsEmailSent(true);
+      setIsEmailSent(true); // L'email a été envoyé avec succès
     } catch (error: any) {
+      // Gestion des erreurs d'API
       setError(error.message || 'Une erreur est survenue');
     } finally {
-      setIsLoading(false);
+      setIsLoading(false); // Arrête l'animation de chargement
     }
   };
 
@@ -34,7 +36,7 @@ function ForgotPassword() {
           Mot de passe oublié
         </h2>
         <p className="mt-2 text-center text-sm text-gray-600">
-          {!isEmailSent 
+          {!isEmailSent
             ? "Entrez votre adresse email pour réinitialiser votre mot de passe"
             : "Un email de réinitialisation vous a été envoyé"
           }
@@ -66,7 +68,7 @@ function ForgotPassword() {
               </div>
 
               {error && (
-                <div className="text-red-600 text-sm">{error}</div>
+                <div className="text-red-600 text-sm">{error}</div> // Affichage des erreurs
               )}
 
               <div>
@@ -86,7 +88,7 @@ function ForgotPassword() {
               </div>
               <h3 className="mt-4 text-lg font-medium text-gray-900">Vérifiez votre boîte mail</h3>
               <p className="mt-2 text-sm text-gray-600">
-                Nous avons envoyé un lien de réinitialisation à <strong>{email}</strong>. 
+                Nous avons envoyé un lien de réinitialisation à <strong>{email}</strong>.
                 Cliquez sur le lien dans l'email pour réinitialiser votre mot de passe.
               </p>
               <p className="mt-4 text-sm text-gray-500">

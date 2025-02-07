@@ -25,9 +25,9 @@ function PrivateRoute({ children }: { children: React.ReactNode }) {
     // Vérifier l'authentification
     const checkAuth = async () => {
       const token = authService.getToken();
-      if (!token || authService.isTokenExpired()) {
+      if (!token || authService.isTokenExpired(token)) {  // Passer le token ici
         // Si pas de token ou token expiré, rediriger vers la connexion
-        authService.removeToken();
+        authService.removeTokens();
         navigate('/login');
       }
     };
@@ -37,7 +37,7 @@ function PrivateRoute({ children }: { children: React.ReactNode }) {
 
   // Vérifier le token avant de rendre le contenu
   const token = authService.getToken();
-  if (!token || authService.isTokenExpired()) {
+  if (!token || authService.isTokenExpired(token)) {  // Passer le token ici
     return null; // Ne rien rendre pendant la redirection
   }
 

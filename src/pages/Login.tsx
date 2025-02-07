@@ -1,30 +1,38 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { Film, Mail, Key, Eye, EyeOff } from 'lucide-react';
 import { authService } from '../services/authService';
+import { LoginRequest } from '../types'; // Assurez-vous que le chemin est correct
 
 function Login() {
   const navigate = useNavigate();
   const location = useLocation();
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-  const [error, setError] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
+  const [email, setEmail] = useState<string>('');
+  const [password, setPassword] = useState<string>('');
+  const [showPassword, setShowPassword] = useState<boolean>(false);
+  const [error, setError] = useState<string>('');
+  const [isLoading, setIsLoading] = useState<boolean>(false);
 
   // Récupérer le message de succès s'il existe
   const successMessage = location.state?.message;
+
+  // Nettoyer l'erreur chaque fois que l'utilisateur modifie l'email ou le mot de passe
+  useEffect(() => {
+    setError('');
+  }, [email, password]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setIsLoading(true);
 
+    const loginData: LoginRequest = { email, password };
+
     try {
-      await authService.login(email, password);
+      await authService.login(loginData); // Envoie un objet LoginRequest
       navigate('/');
     } catch (error: any) {
-      setError(error.message || 'Une erreur est survenue lors de la connexion');
+      setError(error?.response?.data?.detail || 'Une erreur est survenue lors de la connexion');
     } finally {
       setIsLoading(false);
     }
@@ -36,12 +44,8 @@ function Login() {
         <div className="flex justify-center">
           <Film className="w-12 h-12 text-blue-600" />
         </div>
-        <h2 className="mt-6 text-center text-3xl font-bold text-gray-900">
-          CinéManager
-        </h2>
-        <p className="mt-2 text-center text-sm text-gray-600">
-          Connectez-vous pour accéder à votre espace
-        </p>
+        <h2 className="mt-6 text-center text-3xl font-bold text-gray-900">CinéManager</h2>
+        <p className="mt-2 text-center text-sm text-gray-600">Connectez-vous pour accéder à votre espace</p>
       </div>
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
@@ -69,6 +73,7 @@ function Login() {
                   className="appearance-none block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                   placeholder="exemple@email.com"
                   required
+                  aria-describedby="email-error"
                 />
               </div>
             </div>
@@ -88,6 +93,7 @@ function Login() {
                   onChange={(e) => setPassword(e.target.value)}
                   className="appearance-none block w-full pl-10 pr-10 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                   required
+                  aria-describedby="password-error"
                 />
                 <button
                   type="button"
@@ -112,7 +118,9 @@ function Login() {
             </div>
 
             {error && (
-              <div className="text-red-600 text-sm">{error}</div>
+              <div id="error-message" className="text-red-600 text-sm" role="alert" aria-live="assertive">
+                {error}
+              </div>
             )}
 
             <div>

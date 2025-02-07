@@ -1,65 +1,85 @@
-// Ajout des nouvelles interfaces pour la gestion des utilisateurs
 export interface Group {
-  id: string;
+  id: string; // UUID
   name: string;
   description: string;
-  created_at: Date;
+  created_at: string; // Format ISO 8601
 }
 
 export interface Permission {
-  id: string;
+  id: string; // UUID
   name: string;
   description: string;
   resource: string;
   action: string;
-  created_at: Date;
-}
-
-export interface UserGroup {
-  user_id: string;
-  group_id: string;
-}
-
-export interface GroupPermission {
-  group_id: string;
-  permission_id: string;
+  created_at: string; // Format ISO 8601
 }
 
 export interface User {
-  id: string;
+  id: string; // UUID
   username: string;
   email: string;
   groups: Group[];
   permissions: Permission[];
 }
 
+export interface AuthTokens {
+  refresh: string;
+  access: string;
+}
+
+export interface PasswordResetRequest {
+  email: string;
+}
+
+export interface PasswordResetConfirm {
+  new_password: string;
+  confirm_password: string;
+}
+
+export interface PasswordChange {
+  old_password: string;
+  new_password: string;
+}
+
+export interface LoginRequest {
+  email: string;
+  password: string;
+}
+
+export interface LogoutRequest {
+  refresh: string;
+}
+
+export interface TokenRefreshRequest {
+  refresh: string;
+}
+
+export type StatutActivite = 'En cours' | 'Terminée' | 'En attente';
+
 export interface SousActivite {
-  id: string;
+  id: string; // UUID
   nom: string;
   description: string;
   montantPrevu: number;
   montantDepense: number;
-  dateDebut?: Date;
-  dateFin?: Date;
-  statut: 'En cours' | 'Terminée' | 'En attente';
-  intervenant: Intervenant;
-  createdBy: User; // Ajout du créateur
-  createdAt: Date; // Ajout de la date de création
+  dateDebut?: string; // Format ISO 8601
+  dateFin?: string;   // Format ISO 8601
+  statut: StatutActivite;
+  createdBy: User;
+  createdAt: string; // Format ISO 8601
 }
 
 export interface Activite {
-  id: string;
-  projetId: string;
+  id: string; // UUID
+  projetId: string; // UUID
   nom: string;
   description: string;
   montantTotal: number;
   montantDepense: number;
-  dateDebut?: Date;
-  dateFin?: Date;
-  statut: 'En cours' | 'Terminée' | 'En attente';
+  dateDebut?: string; // Format ISO 8601
+  dateFin?: string;   // Format ISO 8601
+  statut: StatutActivite;
   sousActivites: SousActivite[];
-  createdBy: User; // Ajout du créateur
-  createdAt: Date; // Ajout de la date de création
+  createdBy: User;
+  createdAt: string; // Format ISO 8601
 }
-
-// ... reste du fichier inchangé
