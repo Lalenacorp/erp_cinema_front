@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, UserCog, Shield, Users as UsersIcon } from 'lucide-react';
 import { authService } from '../services/authService';
-import type { User } from '../types';
+import type { User, Group } from '../types'; // Assurez-vous d'importer Group
 import UserGroupsModal from '../components/UserGroupsModal';
 import InviteUserModal from '../components/InviteUserModal';
 
@@ -28,24 +28,27 @@ function UserManagement() {
     }
   };
 
-/*   const handleUpdateUserGroups = async (userId: string, groupIds: string[]) => {
-    try {
-      await authService.updateUserGroups(userId, groupIds);
-      await loadUsers();
-    } catch (error) {
-      console.error('Error updating user groups:', error);
-    }
-  }; */
-
   const handleInviteUser = async (email: string, groupIds: string[]) => {
     try {
-      await authService.createUser(email, groupIds);
+      // Passer un objet avec `email` et `groupIds`
+      await authService.createUser({ email, groupIds });
       await loadUsers();
     } catch (error) {
       console.error('Error inviting user:', error);
       alert("Erreur lors de l'invitation de l'utilisateur");
     }
   };
+  const handleUpdateUserGroups = async (userId: string, groupIds: string[]) => {
+    try {
+      // Passez un objet avec `userId` et `groupIds`
+      await authService.updateUserGroups({ userId, groupIds });
+      loadUsers(); // Recharge les utilisateurs après la mise à jour
+    } catch (error) {
+      console.error('Erreur lors de la mise à jour des groupes de l\'utilisateur:', error);
+      alert("Erreur lors de la mise à jour des groupes");
+    }
+  };
+  
 
   return (
     <>
@@ -128,10 +131,10 @@ function UserManagement() {
             setIsUserGroupsModalOpen(false);
             setSelectedUser(null);
           }}
-          userId={selectedUser.id}
+          userId={selectedUser.id}  // Utilisation de `selectedUser.id`
           userEmail={selectedUser.email}
-          initialGroups={selectedUser.groups ? selectedUser.groups.map((g) => g.id) : []} // ✅ Vérification pour éviter undefined
-          onSubmit={(groupIds) => handleUpdateUserGroups(selectedUser.id, groupIds)}
+          initialGroups={selectedUser.groups ? selectedUser.groups.map((g) => g.id) : []}
+          onSubmit={(groupIds) => handleUpdateUserGroups(selectedUser.id, groupIds)}  // Utilisation de `groupIds` en tant que chaînes
         />
       )}
     </>

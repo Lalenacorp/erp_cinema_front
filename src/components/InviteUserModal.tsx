@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, Mail, Shield } from 'lucide-react';
 import type { Group } from '../types';
 import { authService } from '../services/authService';
@@ -19,16 +19,16 @@ const InviteUserModal: React.FC<InviteUserModalProps> = ({
   const [groups, setGroups] = useState<Group[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  React.useEffect(() => {
-    loadGroups();
-  }, []);
+  useEffect(() => {
+    if (isOpen) loadGroups();
+  }, [isOpen]);
 
   const loadGroups = async () => {
     try {
       const data = await authService.getAllGroups();
       setGroups(data);
     } catch (error) {
-      console.error('Error loading groups:', error);
+      console.error('Erreur lors du chargement des groupes:', error);
     }
   };
 
@@ -39,11 +39,13 @@ const InviteUserModal: React.FC<InviteUserModalProps> = ({
     setIsSubmitting(true);
     try {
       await onSubmit(email, selectedGroups);
+      alert(`Invitation envoyée avec succès à ${email}`);
       setEmail('');
       setSelectedGroups([]);
       onClose();
     } catch (error) {
-      console.error('Error inviting user:', error);
+      console.error('Erreur lors de l\'invitation de l\'utilisateur:', error);
+      alert('Échec de l\'invitation. Vérifiez les informations.');
     } finally {
       setIsSubmitting(false);
     }
@@ -58,7 +60,7 @@ const InviteUserModal: React.FC<InviteUserModalProps> = ({
           <div>
             <h2 className="text-2xl font-bold">Inviter un utilisateur</h2>
             <p className="text-gray-600 mt-1">
-              Envoyez une invitation par email et assignez des groupes
+              Envoyez une invitation par email et assignez des groupes.
             </p>
           </div>
           <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
@@ -89,32 +91,37 @@ const InviteUserModal: React.FC<InviteUserModalProps> = ({
               Groupes
             </label>
             <div className="space-y-3">
-              {groups.map((group) => (
-                <label
-                  key={group.id}
-                  className="flex items-start p-4 border rounded-lg hover:bg-gray-50 cursor-pointer"
-                >
-                  <input
-                    type="checkbox"
-                    checked={selectedGroups.includes(group.id)}
-                    onChange={(e) => {
-                      if (e.target.checked) {
-                        setSelectedGroups([...selectedGroups, group.id]);
-                      } else {
-                        setSelectedGroups(selectedGroups.filter(id => id !== group.id));
-                      }
-                    }}
-                    className="mt-1"
-                  />
-                  <div className="ml-3">
-                    <div className="flex items-center gap-2">
-                      <Shield className="w-4 h-4 text-blue-600" />
-                      <p className="font-medium">{group.name}</p>
+              {/* Vérifier si `groups` est défini et est un tableau avant d'utiliser map */}
+              {Array.isArray(groups) && groups.length > 0 ? (
+                groups.map((group) => (
+                  <label
+                    key={group.id}
+                    className="flex items-start p-4 border rounded-lg hover:bg-gray-50 cursor-pointer"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selectedGroups.includes(group.id)}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setSelectedGroups([...selectedGroups, group.id]);
+                        } else {
+                          setSelectedGroups(selectedGroups.filter(id => id !== group.id));
+                        }
+                      }}
+                      className="mt-1"
+                    />
+                    <div className="ml-3">
+                      <div className="flex items-center gap-2">
+                        <Shield className="w-4 h-4 text-blue-600" />
+                        <p className="font-medium">{group.name}</p>
+                      </div>
+                      <p className="text-sm text-gray-600 mt-1">{group.permissions}</p>
                     </div>
-                    <p className="text-sm text-gray-600 mt-1">{group.description}</p>
-                  </div>
-                </label>
-              ))}
+                  </label>
+                ))
+              ) : (
+                <p>Aucun groupe disponible</p>
+              )}
             </div>
           </div>
 
@@ -130,7 +137,7 @@ const InviteUserModal: React.FC<InviteUserModalProps> = ({
             <button
               type="submit"
               className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
-              disabled={isSubmitting || !email || selectedGroups.length === 0}
+              disabled={isSubmitting || !email}
             >
               {isSubmitting ? 'Envoi en cours...' : 'Envoyer l\'invitation'}
             </button>

@@ -1,6 +1,6 @@
 import { api } from '../lib/api'; // Assurez-vous que cette importation est correcte
-import type { User, AuthTokens, LoginRequest } from '../types';
-import {jwtDecode} from 'jwt-decode';  // Correction de l'importation de jwt-decode
+import type { User, AuthTokens, LoginRequest, Group } from '../types';
+import { jwtDecode } from 'jwt-decode';  // Correction de l'importation de jwt-decode
 
 export const authService = {
   // Récupérer le token d'authentification (Access token) depuis le localStorage
@@ -33,22 +33,18 @@ export const authService = {
     };
 
     try {
-      // Faire la requête et obtenir la réponse
       const response = await api.post(`/api/login/`, data);
-
-      // Afficher la réponse pour vérifier la structure
       console.log('Réponse de l\'API:', response);
 
-      // Vérifier si la réponse contient les tokens
       if (response && response.access && response.refresh) {
-        this.setTokens(response);  // Enregistre les tokens
+        this.setTokens(response);
         return response;
       } else {
         throw new Error('Les tokens d\'accès et de rafraîchissement sont manquants.');
       }
     } catch (error) {
       console.error('Erreur de login:', error);
-      throw error;  // On propage l'erreur
+      throw error;
     }
   },
 
@@ -63,21 +59,21 @@ export const authService = {
       const response = await api.post('/api/token/refresh/', { refresh: refreshToken });
 
       if (response && response.access) {
-        this.setTokens(response);  // Met à jour le token d'accès
+        this.setTokens(response);
         return response;
       } else {
         throw new Error('Token d\'accès manquant dans la réponse de rafraîchissement.');
       }
     } catch (error) {
       console.error('Erreur lors du rafraîchissement du token:', error);
-      throw error;  // On propage l'erreur
+      throw error;
     }
   },
 
   // Déconnexion utilisateur
   logout(): void {
     this.removeTokens();
-    window.location.href = '/login'; // Redirection vers la page de connexion
+    window.location.href = '/login';
   },
 
   // Récupérer l'utilisateur courant à partir du token
@@ -86,18 +82,17 @@ export const authService = {
       const token = this.getToken();
       if (!token || this.isTokenExpired(token)) return null;
 
-      // Décodage du token JWT pour obtenir les informations de l'utilisateur
       const decoded: any = jwtDecode(token);
       return { 
         id: decoded.user_id, 
         username: decoded.username, 
         email: decoded.email,
-        groups: decoded.groups || [],  // Ajout des groupes de l'utilisateur, si présents
-        permissions: decoded.permissions || []  // Ajout des permissions de l'utilisateur, si présentes
+        groups: decoded.groups || [],
+        permissions: decoded.permissions || []
       };
     } catch (error) {
       console.error('Erreur lors de la récupération de l\'utilisateur:', error);
-      return null; // Retourner null en cas d'erreur
+      return null;
     }
   },
 
@@ -105,44 +100,39 @@ export const authService = {
   isTokenExpired(token: string): boolean {
     try {
       const decoded: any = jwtDecode(token);
-      const exp = decoded.exp;
-      const currentTime = Date.now() / 1000;
-      return exp < currentTime; // Vérifier si l'expiration est dans le passé
+      return decoded.exp < Date.now() / 1000;
     } catch (error) {
       console.error('Erreur lors de la validation du token:', error);
-      return true; // Si le token est invalide ou si un problème se produit, on le considère expiré
+      return true;
     }
   },
 
   // Demander une réinitialisation du mot de passe
- // Demander une réinitialisation du mot de passe
-async requestPasswordReset(email: string): Promise<void> {
-  try {
-    if (!email) {
-      throw new Error("L'adresse email est requise.");
+  async requestPasswordReset(email: string): Promise<void> {
+    try {
+      if (!email) {
+        throw new Error("L'adresse email est requise.");
+      }
+
+      const emailRegex = /^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,4}$/;
+      if (!emailRegex.test(email)) {
+        throw new Error("Adresse email invalide.");
+      }
+
+      await api.post('/api/forgot-password/', { email });
+      console.log('Demande de réinitialisation du mot de passe envoyée avec succès.');
+    } catch (error: any) {
+      const errorMessage = error.response ? error.response.data.message : error.message || 'Une erreur est survenue';
+      console.error('Erreur lors de la demande de réinitialisation du mot de passe:', errorMessage);
+      throw new Error(errorMessage);
     }
-
-    // Vérification de la validité de l'email
-    const emailRegex = /^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,4}$/;
-    if (!emailRegex.test(email)) {
-      throw new Error("Adresse email invalide.");
-    }
-
-    await api.post('/api/forgot-password/', { email });
-    console.log('Demande de réinitialisation du mot de passe envoyée avec succès.');
-  } catch (error: any) {
-    const errorMessage = error.response ? error.response.data.message : error.message || 'Une erreur est survenue';
-    console.error('Erreur lors de la demande de réinitialisation du mot de passe:', errorMessage);
-    throw new Error(errorMessage);  // On propage l'erreur avec un message plus précis
-  }
-},
-
+  },
 
   // Obtenir la liste de tous les utilisateurs
   async getAllUsers(): Promise<User[]> {
     try {
       const response = await api.get('/api/users/');
-      return response.data; // Retourne la liste des utilisateurs
+      return response.data;
     } catch (error) {
       console.error('Erreur lors de la récupération des utilisateurs:', error);
       throw error;
@@ -153,7 +143,7 @@ async requestPasswordReset(email: string): Promise<void> {
   async getUserById(userId: number): Promise<User> {
     try {
       const response = await api.get(`/api/users/${userId}/`);
-      return response.data; // Retourne les détails de l'utilisateur
+      return response.data;
     } catch (error) {
       console.error(`Erreur lors de la récupération de l'utilisateur ${userId}:`, error);
       throw error;
@@ -161,27 +151,22 @@ async requestPasswordReset(email: string): Promise<void> {
   },
 
   // Créer un nouvel utilisateur
-  async createUser(userData: {
-    first_name: string;
-    last_name: string;
-    username: string;
-    email: string;
-    password: string;
-  }): Promise<User> {
-    try {
-      const response = await api.post('/api/users/register/', userData);
-      return response.data; // Retourne les données de l'utilisateur créé
-    } catch (error) {
-      console.error('Erreur lors de la création de l\'utilisateur:', error);
-      throw error;
-    }
-  },
+// authService.ts
+async createUser(data: { email: string; groupIds: string[] }): Promise<User> {
+  try {
+    const response = await api.post('/api/users/register/', data);  // Assurez-vous que l'endpoint est correct
+    return response.data; // Retourne les données de l'utilisateur créé
+  } catch (error) {
+    console.error('Erreur lors de l\'invitation de l\'utilisateur:', error);
+    throw error;
+  }
+},
 
   // Mettre à jour un utilisateur existant (PATCH)
   async updateUser(userId: number, userData: Partial<User>): Promise<User> {
     try {
       const response = await api.patch(`/api/users/${userId}/`, userData);
-      return response.data; // Retourne les nouvelles données mises à jour
+      return response.data;
     } catch (error) {
       console.error(`Erreur lors de la mise à jour de l'utilisateur ${userId}:`, error);
       throw error;
@@ -198,6 +183,27 @@ async requestPasswordReset(email: string): Promise<void> {
       throw error;
     }
   },
+
+  // Récupérer la liste de tous les groupes
+  async getAllGroups(): Promise<Group[]> {
+    try {
+      const response = await api.get('/api/groups/');
+      return response.data;
+    } catch (error) {
+      console.error('Erreur lors de la récupération des groupes:', error);
+      throw error;
+    }
+  },
+
+  // Mettre à jour les groupes d'un utilisateur
+async updateUserGroups(data: { userId: string; groupIds: string[] }): Promise<void> {
+  try {
+    // Utilisez l'objet pour mettre à jour les groupes de l'utilisateur
+    await api.patch(`/api/users/${data.userId}/groups/`, { groupIds: data.groupIds });  // Assurez-vous que l'endpoint est correct
+  } catch (error) {
+    console.error('Erreur lors de la mise à jour des groupes de l\'utilisateur:', error);
+    throw error;
+  }
+}
+
 };
-
-

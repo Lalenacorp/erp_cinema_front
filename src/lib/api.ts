@@ -136,6 +136,11 @@ export const api = {
     body: JSON.stringify(data),
   }),
 
+  patch: (endpoint: string, data?: any) => fetchWithAuth(endpoint, { // Ajout de PATCH
+    method: 'PATCH',
+    body: JSON.stringify(data),
+  }),
+
   delete: (endpoint: string) => fetchWithAuth(endpoint, {
     method: 'DELETE',
   }),

@@ -1,8 +1,7 @@
 export interface Group {
   id: string; // UUID
   name: string;
-  description: string;
-  created_at: string; // Format ISO 8601
+  permissions: string;
 }
 
 export interface Permission {
