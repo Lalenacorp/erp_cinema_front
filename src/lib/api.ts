@@ -8,11 +8,14 @@ export type ApiError = {
 
 // Configuration de base pour les requêtes API
 const API_CONFIG = {
-  baseUrl: 'http://13.38.238.104',
+  baseUrl: 'http://13.38.119.12',
   headers: {
     'Content-Type': 'application/json',
   },
+  timeout : 20000,
 };
+
+
 
 // Fonction utilitaire pour gérer les erreurs
 const handleApiError = (error: any): never => {
@@ -124,7 +127,7 @@ const fetchWithAuth = async (endpoint: string, options: RequestInit = {}): Promi
 
 // API Client
 export const api = {
-  get: (endpoint: string) => fetchWithAuth(endpoint),
+  get: (endpoint: string, options: RequestInit = {}): Promise<any> => fetchWithAuth(endpoint, options),
 
   post: (endpoint: string, data?: any) => fetchWithAuth(endpoint, {
     method: 'POST',
@@ -136,12 +139,7 @@ export const api = {
     body: JSON.stringify(data),
   }),
 
-  patch: (endpoint: string, data?: any) => fetchWithAuth(endpoint, { // Ajout de PATCH
-    method: 'PATCH',
-    body: JSON.stringify(data),
-  }),
+  patch: (endpoint: string, data?: any, options?: RequestInit) => fetchWithAuth(endpoint, { method: 'PATCH', body: JSON.stringify(data), ...options }),
 
-  delete: (endpoint: string) => fetchWithAuth(endpoint, {
-    method: 'DELETE',
-  }),
+  delete: (endpoint: string, options?: RequestInit) => fetchWithAuth(endpoint, { method: 'DELETE', ...options }), // ici la méthode DELETE
 };

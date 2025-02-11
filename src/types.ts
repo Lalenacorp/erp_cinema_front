@@ -15,10 +15,13 @@ export interface Permission {
 
 export interface User {
   id: string; // UUID
+  first_name: string;
+  last_name: string;
   username: string;
   email: string;
+  password: string
   groups: Group[];
-  permissions: Permission[];
+ // permissions: Permission[];
 }
 
 export interface AuthTokens {

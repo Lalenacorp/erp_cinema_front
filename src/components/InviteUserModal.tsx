@@ -1,12 +1,16 @@
-import React, { useState, useEffect } from 'react';
-import { X, Mail, Shield } from 'lucide-react';
-import type { Group } from '../types';
-import { authService } from '../services/authService';
+import React, { useState } from 'react';
+import { X, Mail, User, Lock } from 'lucide-react';
 
 interface InviteUserModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (email: string, groupIds: string[]) => Promise<void>;
+  onSubmit: (
+    email: string,
+    firstName: string,
+    lastName: string,
+    username: string,
+    password: string
+  ) => Promise<void>;
 }
 
 const InviteUserModal: React.FC<InviteUserModalProps> = ({
@@ -15,22 +19,11 @@ const InviteUserModal: React.FC<InviteUserModalProps> = ({
   onSubmit
 }) => {
   const [email, setEmail] = useState('');
-  const [selectedGroups, setSelectedGroups] = useState<string[]>([]);
-  const [groups, setGroups] = useState<Group[]>([]);
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-
-  useEffect(() => {
-    if (isOpen) loadGroups();
-  }, [isOpen]);
-
-  const loadGroups = async () => {
-    try {
-      const data = await authService.getAllGroups();
-      setGroups(data);
-    } catch (error) {
-      console.error('Erreur lors du chargement des groupes:', error);
-    }
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -38,10 +31,13 @@ const InviteUserModal: React.FC<InviteUserModalProps> = ({
 
     setIsSubmitting(true);
     try {
-      await onSubmit(email, selectedGroups);
+      await onSubmit(email, firstName, lastName, username, password);
       alert(`Invitation envoyée avec succès à ${email}`);
       setEmail('');
-      setSelectedGroups([]);
+      setFirstName('');
+      setLastName('');
+      setUsername('');
+      setPassword('');
       onClose();
     } catch (error) {
       console.error('Erreur lors de l\'invitation de l\'utilisateur:', error);
@@ -60,7 +56,7 @@ const InviteUserModal: React.FC<InviteUserModalProps> = ({
           <div>
             <h2 className="text-2xl font-bold">Inviter un utilisateur</h2>
             <p className="text-gray-600 mt-1">
-              Envoyez une invitation par email et assignez des groupes.
+              Remplissez les informations et envoyez une invitation.
             </p>
           </div>
           <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
@@ -69,6 +65,56 @@ const InviteUserModal: React.FC<InviteUserModalProps> = ({
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Prénom
+              </label>
+              <div className="relative">
+                <User className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                <input
+                  type="text"
+                  value={firstName}
+                  onChange={(e) => setFirstName(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                  required
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Nom
+              </label>
+              <div className="relative">
+                <User className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                <input
+                  type="text"
+                  value={lastName}
+                  onChange={(e) => setLastName(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                  required
+                />
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Nom d'utilisateur
+            </label>
+            <div className="relative">
+              <User className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+              <input
+                type="text"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                required
+              />
+            </div>
+          </div>
+
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Adresse email
@@ -80,48 +126,24 @@ const InviteUserModal: React.FC<InviteUserModalProps> = ({
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
-                placeholder="exemple@email.com"
                 required
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Groupes
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Mot de passe
             </label>
-            <div className="space-y-3">
-              {/* Vérifier si `groups` est défini et est un tableau avant d'utiliser map */}
-              {Array.isArray(groups) && groups.length > 0 ? (
-                groups.map((group) => (
-                  <label
-                    key={group.id}
-                    className="flex items-start p-4 border rounded-lg hover:bg-gray-50 cursor-pointer"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={selectedGroups.includes(group.id)}
-                      onChange={(e) => {
-                        if (e.target.checked) {
-                          setSelectedGroups([...selectedGroups, group.id]);
-                        } else {
-                          setSelectedGroups(selectedGroups.filter(id => id !== group.id));
-                        }
-                      }}
-                      className="mt-1"
-                    />
-                    <div className="ml-3">
-                      <div className="flex items-center gap-2">
-                        <Shield className="w-4 h-4 text-blue-600" />
-                        <p className="font-medium">{group.name}</p>
-                      </div>
-                      <p className="text-sm text-gray-600 mt-1">{group.permissions}</p>
-                    </div>
-                  </label>
-                ))
-              ) : (
-                <p>Aucun groupe disponible</p>
-              )}
+            <div className="relative">
+              <Lock className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+                required
+              />
             </div>
           </div>
 
@@ -137,7 +159,7 @@ const InviteUserModal: React.FC<InviteUserModalProps> = ({
             <button
               type="submit"
               className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
-              disabled={isSubmitting || !email}
+              disabled={isSubmitting || !email || !password}
             >
               {isSubmitting ? 'Envoi en cours...' : 'Envoyer l\'invitation'}
             </button>

@@ -17,6 +17,7 @@ import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
 import SetPassword from './pages/SetPassword';
 import { authService } from './services/authService';
+import UserDetails from './components/UserDetails';
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate();
@@ -72,6 +73,7 @@ function App() {
         <Route path="/utilisateurs" element={<PrivateRoute><UserManagement /></PrivateRoute>} />
         <Route path="/parametres" element={<PrivateRoute><Parametres /></PrivateRoute>} />
         <Route path="/profile" element={<PrivateRoute><Profile /></PrivateRoute>} />
+        <Route path="/users/:id" element={<UserDetails />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Router>

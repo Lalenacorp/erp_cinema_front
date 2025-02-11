@@ -85,10 +85,13 @@ export const authService = {
       const decoded: any = jwtDecode(token);
       return { 
         id: decoded.user_id, 
+        first_name: decoded.first_name,
+        last_name: decoded.last_name,
         username: decoded.username, 
         email: decoded.email,
+        password: decoded.password,
         groups: decoded.groups || [],
-        permissions: decoded.permissions || []
+      //  permissions: decoded.permissions || []
       };
     } catch (error) {
       console.error('Erreur lors de la récupération de l\'utilisateur:', error);
@@ -129,60 +132,191 @@ export const authService = {
   },
 
   // Obtenir la liste de tous les utilisateurs
-  async getAllUsers(): Promise<User[]> {
-    try {
-      const response = await api.get('/api/users/');
-      return response.data;
-    } catch (error) {
-      console.error('Erreur lors de la récupération des utilisateurs:', error);
-      throw error;
-    }
-  },
-
-  // Obtenir un utilisateur spécifique par ID
-  async getUserById(userId: number): Promise<User> {
-    try {
-      const response = await api.get(`/api/users/${userId}/`);
-      return response.data;
-    } catch (error) {
-      console.error(`Erreur lors de la récupération de l'utilisateur ${userId}:`, error);
-      throw error;
-    }
-  },
-
-  // Créer un nouvel utilisateur
-// authService.ts
-async createUser(data: { email: string; groupIds: string[] }): Promise<User> {
+// Exemple de récupération des utilisateurs
+async getAllUsers(): Promise<User[]> {
   try {
-    const response = await api.post('/api/users/register/', data);  // Assurez-vous que l'endpoint est correct
-    return response.data; // Retourne les données de l'utilisateur créé
-  } catch (error) {
-    console.error('Erreur lors de l\'invitation de l\'utilisateur:', error);
+    const token = this.getToken();
+    console.log("🔑 Token utilisé :", token);
+
+    if (!token) {
+      throw new Error("❌ Token manquant !");
+    }
+
+    const response = await api.get('/api/users/', {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    // Log the complete response
+    console.log("📡 Response complète:", response);
+
+    // Try to get data from different possible response formats
+    let users;
+    if (response.data) {
+      users = response.data;
+    } else if (Array.isArray(response)) {
+      users = response;
+    } else if (typeof response === 'string') {
+      try {
+        users = JSON.parse(response);
+      } catch (e) {
+        console.error("❌ Impossible de parser la réponse comme JSON:", e);
+      }
+    } else {
+      users = response; // Try using the response directly
+    }
+
+    console.log("📡 Données extraites:", users);
+
+    // Validate the data
+    if (!users) {
+      throw new Error("❌ Impossible d'extraire les données de la réponse");
+    }
+
+    if (!Array.isArray(users)) {
+      throw new Error(`⚠️ Les données ne sont pas un tableau (type reçu: ${typeof users})`);
+    }
+
+    // Validate the structure of each user object
+    const validUsers = users.every(user => 
+      typeof user === 'object' &&
+      user !== null &&
+      'id' in user &&
+      'username' in user &&
+      'email' in user
+    );
+
+    if (!validUsers) {
+      throw new Error("⚠️ Certains objets utilisateur ne sont pas valides");
+    }
+
+    console.log("✅ Données des utilisateurs validées:", users);
+    return users;
+  } catch (error: any) {
+    console.error("❌ Erreur API détaillée:", {
+      message: error.message,
+      response: error.response?.data,
+      status: error.response?.status,
+      rawResponse: error.response
+    });
+    throw error;
+  }
+},
+  // Obtenir un utilisateur spécifique par ID
+  async getUserById(id: string): Promise<User> {
+    const token = this.getToken();
+    if (!token) {
+      throw new Error('Utilisateur non authentifié');
+    }
+
+    try {
+      const response = await fetch(`http://13.38.119.12/api/users/${id}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`  // Ajoute le token dans les en-têtes
+        }
+      });
+      console.log("📡 Token complète : ", token);
+      // Log pour inspecter la réponse
+      console.log("📡 Réponse API complète : ", response);
+
+      // Vérifiez ici si le code de statut HTTP est correct (200 OK)
+      if (!response.ok) {
+        throw new Error(`Erreur HTTP: ${response.status}`);
+      }
+
+      // On tente de parser la réponse JSON
+      const data = await response.json();
+
+      // Log pour inspecter les données
+      console.log("Données de l'utilisateur récupérées : ", data);
+
+      // Vérifiez si les données sont valides (par exemple : ID de l'utilisateur)
+      if (data && data.id) {
+        return data;  // Si les données sont valides, renvoyer l'utilisateur
+      } else {
+        throw new Error('Utilisateur non trouvé ou données invalides');
+      }
+    } catch (error) {
+      //console.error('❌ Erreur API :', error.message || error);
+      throw new Error('Données invalides ou utilisateur non trouvé');
+    }
+  },
+
+
+  // Créer un nouvel utilisateur avec tous les champs nécessaires
+  async createUser(data: {
+    email: string;
+    first_name: string;
+    last_name: string;
+    username: string;
+    password: string;
+  }): Promise<User> {
+    try {
+      console.log("Données envoyées à l'API :", data);
+
+      const response = await api.post('/api/user/register/', {
+        first_name: data.first_name,
+        last_name: data.last_name,
+        username: data.username,
+        email: data.email,
+        password: data.password,
+      });
+
+      console.log("Réponse de l'API :", response.data);
+      return response.data;
+    } catch (error: any) {
+      console.error("Erreur lors de la création de l'utilisateur:", error.response?.data || error.message);
+      throw error;
+    }
+  },
+
+ // Mettre à jour un utilisateur existant
+// Mettre à jour un utilisateur existant
+async updateUser(id: string, userData: Partial<User>): Promise<User> {
+  try {
+    const token = this.getToken();
+    
+    if (!token) {
+      throw new Error("❌ Token manquant !");
+    }
+
+    const response = await api.put(`/api/users/${id}/`, {
+      ...userData,
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    return response.data;
+  } catch (error: any) {
+    console.error("❌ Erreur lors de la mise à jour de l'utilisateur:", error);
+    throw error;
+  }
+},
+  // Supprimer un utilisateur
+// Supprimer un utilisateur
+async deleteUser(id: string): Promise<void> {
+  try {
+    const token = this.getToken();
+    
+    if (!token) {
+      throw new Error("❌ Token manquant !");
+    }
+
+    await api.delete(`/api/users/${id}/`, {
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+  } catch (error: any) {
+    console.error("❌ Erreur lors de la suppression de l'utilisateur:", error);
     throw error;
   }
 },
 
-  // Mettre à jour un utilisateur existant (PATCH)
-  async updateUser(userId: number, userData: Partial<User>): Promise<User> {
-    try {
-      const response = await api.patch(`/api/users/${userId}/`, userData);
-      return response.data;
-    } catch (error) {
-      console.error(`Erreur lors de la mise à jour de l'utilisateur ${userId}:`, error);
-      throw error;
-    }
-  },
-
-  // Supprimer un utilisateur
-  async deleteUser(userId: number): Promise<void> {
-    try {
-      await api.delete(`/api/users/${userId}/`);
-      console.log(`Utilisateur ${userId} supprimé avec succès.`);
-    } catch (error) {
-      console.error(`Erreur lors de la suppression de l'utilisateur ${userId}:`, error);
-      throw error;
-    }
-  },
 
   // Récupérer la liste de tous les groupes
   async getAllGroups(): Promise<Group[]> {
@@ -196,14 +330,21 @@ async createUser(data: { email: string; groupIds: string[] }): Promise<User> {
   },
 
   // Mettre à jour les groupes d'un utilisateur
-async updateUserGroups(data: { userId: string; groupIds: string[] }): Promise<void> {
-  try {
-    // Utilisez l'objet pour mettre à jour les groupes de l'utilisateur
-    await api.patch(`/api/users/${data.userId}/groups/`, { groupIds: data.groupIds });  // Assurez-vous que l'endpoint est correct
-  } catch (error) {
-    console.error('Erreur lors de la mise à jour des groupes de l\'utilisateur:', error);
-    throw error;
-  }
-}
+  async updateUserGroups(data: { userId: string; groupIds: string[] }): Promise<void> {
+    try {
+      const token = this.getToken();
+      if (!token) {
+        throw new Error('Token d\'accès manquant');
+      }
 
+      await api.patch(`/api/users/${data.userId}/groups/`, { groupIds: data.groupIds }, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+    } catch (error) {
+      console.error("Erreur lors de la mise à jour des groupes de l'utilisateur:", error);
+      throw error;
+    }
+  },
 };

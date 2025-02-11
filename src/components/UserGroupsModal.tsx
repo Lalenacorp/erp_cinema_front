@@ -90,7 +90,6 @@ const UserGroupsModal: React.FC<UserGroupsModalProps> = ({
                 />
                 <div className="ml-3">
                   <p className="font-medium">{group.name}</p>
-                  <p className="text-sm text-gray-600">{group.description}</p>
                 </div>
               </label>
             ))}

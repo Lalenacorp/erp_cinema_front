@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, UserCog, Shield, Users as UsersIcon } from 'lucide-react';
+import { Plus, UserCog, Shield, Users as UsersIcon, Eye } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { authService } from '../services/authService';
-import type { User, Group } from '../types'; // Assurez-vous d'importer Group
+import type { User, Group } from '../types';
 import UserGroupsModal from '../components/UserGroupsModal';
 import InviteUserModal from '../components/InviteUserModal';
 
 function UserManagement() {
+  const navigate = useNavigate();
   const [users, setUsers] = useState<User[]>([]);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [isUserGroupsModalOpen, setIsUserGroupsModalOpen] = useState(false);
@@ -15,40 +17,55 @@ function UserManagement() {
   useEffect(() => {
     loadUsers();
   }, []);
-
+  
   const loadUsers = async () => {
     try {
       const data = await authService.getAllUsers();
-      setUsers(Array.isArray(data) ? data : []); // ✅ S'assurer que `setUsers` reçoit un tableau
+      setUsers(Array.isArray(data) ? data : []);
     } catch (error) {
-      console.error('Error loading users:', error);
-      setUsers([]); // ✅ Évite les erreurs si la requête échoue
+      console.error('Erreur lors du chargement des utilisateurs:', error);
+      setUsers([]);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleInviteUser = async (email: string, groupIds: string[]) => {
+  const handleInviteUser = async (
+    email: string,
+    firstName: string,
+    lastName: string,
+    username: string,
+    password: string
+  ) => {
     try {
-      // Passer un objet avec `email` et `groupIds`
-      await authService.createUser({ email, groupIds });
+      await authService.createUser({
+        first_name: firstName,
+        last_name: lastName,
+        username,
+        email,
+        password,
+      });
+      alert(`Invitation envoyée avec succès à ${email}`);
       await loadUsers();
     } catch (error) {
-      console.error('Error inviting user:', error);
-      alert("Erreur lors de l'invitation de l'utilisateur");
+      console.error('Erreur lors de l\'invitation de l\'utilisateur:', error);
+      alert('Échec de l\'invitation. Vérifiez les informations.');
     }
   };
+
   const handleUpdateUserGroups = async (userId: string, groupIds: string[]) => {
     try {
-      // Passez un objet avec `userId` et `groupIds`
       await authService.updateUserGroups({ userId, groupIds });
-      loadUsers(); // Recharge les utilisateurs après la mise à jour
+      loadUsers();
     } catch (error) {
       console.error('Erreur lors de la mise à jour des groupes de l\'utilisateur:', error);
       alert("Erreur lors de la mise à jour des groupes");
     }
   };
-  
+
+  const handleViewUserDetails = (userId: string) => {
+    navigate(`/users/${userId}`);
+  };
 
   return (
     <>
@@ -89,26 +106,30 @@ function UserManagement() {
                     </div>
                     <div>
                       <h3 className="font-medium">{user.email}</h3>
-                      <div className="flex items-center gap-2 mt-1">
-                        <UsersIcon className="w-4 h-4 text-gray-400" />
-                        <span className="text-sm text-gray-600">
-                          {user.groups && user.groups.length > 0
-                            ? user.groups.map((g) => g.name).join(', ')
-                            : 'Aucun groupe'}
-                        </span>
-                      </div>
+                      <p className="text-sm text-gray-600 mt-1">
+                        {user.first_name} {user.last_name}
+                      </p>
                     </div>
                   </div>
-                  <button
-                    onClick={() => {
-                      setSelectedUser(user);
-                      setIsUserGroupsModalOpen(true);
-                    }}
-                    className="text-blue-600 hover:bg-blue-50 px-4 py-2 rounded-lg flex items-center gap-2"
-                  >
-                    <Shield className="w-4 h-4" />
-                    Gérer les groupes
-                  </button>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => handleViewUserDetails(user.id)}
+                      className="text-gray-600 hover:bg-gray-100 px-4 py-2 rounded-lg flex items-center gap-2"
+                    >
+                      <Eye className="w-4 h-4" />
+                      Voir détails
+                    </button>
+                    <button
+                      onClick={() => {
+                        setSelectedUser(user);
+                        setIsUserGroupsModalOpen(true);
+                      }}
+                      className="text-blue-600 hover:bg-blue-50 px-4 py-2 rounded-lg flex items-center gap-2"
+                    >
+                      <Shield className="w-4 h-4" />
+                      Gérer les groupes
+                    </button>
+                  </div>
                 </div>
               </div>
             ))
@@ -131,10 +152,10 @@ function UserManagement() {
             setIsUserGroupsModalOpen(false);
             setSelectedUser(null);
           }}
-          userId={selectedUser.id}  // Utilisation de `selectedUser.id`
+          userId={selectedUser.id}
           userEmail={selectedUser.email}
           initialGroups={selectedUser.groups ? selectedUser.groups.map((g) => g.id) : []}
-          onSubmit={(groupIds) => handleUpdateUserGroups(selectedUser.id, groupIds)}  // Utilisation de `groupIds` en tant que chaînes
+          onSubmit={(groupIds) => handleUpdateUserGroups(selectedUser.id, groupIds)}
         />
       )}
     </>
