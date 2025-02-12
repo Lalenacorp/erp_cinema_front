@@ -1,17 +1,26 @@
 export interface Group {
   id: string; // UUID
   name: string;
-  permissions: string;
+  permissions: Permission[]; // Correction du type pour être un tableau d'objets Permission
 }
 
+
+
+
 export interface Permission {
-  id: string; // UUID
+  id: number;
   name: string;
-  description: string;
-  resource: string;
-  action: string;
-  created_at: string; // Format ISO 8601
+  codename: string;
+  content_type: string;
+  
 }
+
+// Réponses API
+export interface ApiResponse {
+  message: string;
+  permissions_data?: Permission[];
+}
+
 
 export interface User {
   id: string; // UUID

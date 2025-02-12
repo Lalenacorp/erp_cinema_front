@@ -2,7 +2,9 @@ import { api } from '../lib/api'; // Assurez-vous que cette importation est corr
 import type { User, AuthTokens, LoginRequest, Group } from '../types';
 import { jwtDecode } from 'jwt-decode';  // Correction de l'importation de jwt-decode
 
+
 export const authService = {
+  
   // Récupérer le token d'authentification (Access token) depuis le localStorage
   getToken(): string | null {
     return localStorage.getItem('auth_token');
@@ -283,7 +285,7 @@ async updateUser(id: string, userData: Partial<User>): Promise<User> {
       throw new Error("❌ Token manquant !");
     }
 
-    const response = await api.put(`/api/users/${id}/`, {
+    const response = await api.patch(`/api/users/${id}/`, {
       ...userData,
       headers: {
         Authorization: `Bearer ${token}`,
@@ -296,9 +298,9 @@ async updateUser(id: string, userData: Partial<User>): Promise<User> {
     throw error;
   }
 },
-  // Supprimer un utilisateur
+  
 // Supprimer un utilisateur
-async deleteUser(id: string): Promise<void> {
+async deleteUser(userId: string): Promise<void> {
   try {
     const token = this.getToken();
     
@@ -306,11 +308,16 @@ async deleteUser(id: string): Promise<void> {
       throw new Error("❌ Token manquant !");
     }
 
-    await api.delete(`/api/users/${id}/`, {
+    const response = await fetch(`http://13.38.119.12/api/users/${userId}/`, {
+      method: 'DELETE',
       headers: {
         Authorization: `Bearer ${token}`,
       },
     });
+
+    if (!response.ok) {
+      throw new Error("Erreur lors de la suppression de l'utilisateur");
+    }
   } catch (error: any) {
     console.error("❌ Erreur lors de la suppression de l'utilisateur:", error);
     throw error;
@@ -321,30 +328,137 @@ async deleteUser(id: string): Promise<void> {
   // Récupérer la liste de tous les groupes
   async getAllGroups(): Promise<Group[]> {
     try {
-      const response = await api.get('/api/groups/');
-      return response.data;
-    } catch (error) {
-      console.error('Erreur lors de la récupération des groupes:', error);
-      throw error;
-    }
-  },
-
-  // Mettre à jour les groupes d'un utilisateur
-  async updateUserGroups(data: { userId: string; groupIds: string[] }): Promise<void> {
-    try {
       const token = this.getToken();
+      
       if (!token) {
-        throw new Error('Token d\'accès manquant');
+        throw new Error("❌ Token manquant !");
       }
 
-      await api.patch(`/api/users/${data.userId}/groups/`, { groupIds: data.groupIds }, {
+      const response = await fetch(`http://13.38.119.12/api/groups/`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
       });
-    } catch (error) {
-      console.error("Erreur lors de la mise à jour des groupes de l'utilisateur:", error);
+
+      if (!response.ok) {
+        throw new Error("Erreur lors de la récupération des groupes");
+      }
+
+      return response.json();
+    } catch (error: any) {
+      console.error("❌ Erreur lors de la récupération des groupes:", error);
       throw error;
     }
   },
+
+// Mettre à jour les groupes d'un utilisateur
+async updateUserGroups({ userId, groupIds }: { userId: string; groupIds: string[] }): Promise<void> {
+  try {
+    const token = this.getToken();
+    
+    if (!token) {
+      throw new Error("❌ Token manquant !");
+    }
+
+    if (!groupIds.length) {
+      throw new Error("❌ Aucun groupe sélectionné !");
+    }
+
+    const response = await fetch(`http://13.38.119.12/api/users/${userId}/assign_group/`, {
+      method: 'POST', // Change en 'PATCH' ou 'PUT' si nécessaire
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ group_ids: groupIds }), // Change en { groups: groupIds } si nécessaire
+    });
+
+    const responseData = await response.json(); // Récupérer la réponse du backend
+
+    if (!response.ok) {
+      console.error("❌ Erreur API:", responseData);
+      throw new Error(`Erreur API: ${responseData.detail || "Mise à jour échouée"}`);
+    }
+
+    console.log("✅ Groupes mis à jour avec succès :", responseData);
+  } catch (error: any) {
+    console.error("❌ Erreur lors de la mise à jour des groupes:", error.message);
+    throw error;
+  }
+},
+
+ // Gestion des groupes
+ async getGroupById(groupId: string): Promise<Group> {
+  try {
+    const response = await api.get(`/api/groups/${groupId}`);
+    return response.data;
+  } catch (error) {
+    console.error('Erreur lors de la récupération du groupe:', error);
+    throw error;
+  }
+},
+
+// Création d'un groupe
+async createGroup(name: string): Promise<Group> {
+  try {
+    const response = await api.post(`/api/groups/`, { name });
+    return response.data;
+  } catch (error) {
+    console.error('Erreur lors de la création du groupe:', error);
+    throw error;
+  }
+},
+
+// Mise à jour d'un groupe
+async updateGroup(groupId: string, name: string): Promise<Group> {
+  try {
+    const response = await api.put(`/api/groups/${groupId}/`, { name });
+    return response.data;
+  } catch (error) {
+    console.error(`Erreur lors de la mise à jour du groupe ${groupId}:`, error);
+    throw error;
+  }
+},
+
+
+
+async updateGroupPermissions(groupId: string, permissionIds: string[]): Promise<Group> {
+  try {
+    const response = await api.post(`/api/group/${groupId}/update_permissions/`, {
+      permission_ids: permissionIds
+    });
+
+    console.log('Réponse complète API mise à jour permissions:', response);
+
+    return response.data; // Vérifier si `data` est bien défini
+  } catch (error: any) {
+    console.error('Erreur API:', error.response?.data || error.message);
+    throw error;
+  }
+},
+
+async resetPassword(uid: string | null, token: string | null, password: string): Promise<void> {
+  try {
+    // Vérifier si l'uid et le token sont présents
+    if (!uid || !token) {
+      throw new Error('UID ou Token manquant');
+    }
+
+    // Construire l'URL avec l'uid et le token
+    const url = `/api/reset-password/${uid}/${token}/`;
+
+    // Envoyer la requête POST avec le nouveau mot de passe
+    await api.post(url, { new_password: password, confirm_password: password });
+  } catch (error) {
+    throw new Error('Une erreur est survenue lors de la réinitialisation du mot de passe');
+  }
+},
+
+
+
+
+
+
+
+
 };

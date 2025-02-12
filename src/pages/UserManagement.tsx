@@ -1,17 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, UserCog, Shield, Users as UsersIcon, Eye } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
 import { authService } from '../services/authService';
 import type { User, Group } from '../types';
 import UserGroupsModal from '../components/UserGroupsModal';
 import InviteUserModal from '../components/InviteUserModal';
+import UserDetails from '../components/UserDetails';
 
 function UserManagement() {
-  const navigate = useNavigate();
   const [users, setUsers] = useState<User[]>([]);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [isUserGroupsModalOpen, setIsUserGroupsModalOpen] = useState(false);
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
+  const [isUserDetailsModalOpen, setIsUserDetailsModalOpen] = useState(false);
+  const [selectedUserId, setSelectedUserId] = useState<string>('');
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -64,7 +65,17 @@ function UserManagement() {
   };
 
   const handleViewUserDetails = (userId: string) => {
-    navigate(`/users/${userId}`);
+    setSelectedUserId(userId);
+    setIsUserDetailsModalOpen(true);
+  };
+
+  const handleUserDeleted = () => {
+    loadUsers();
+    setIsUserDetailsModalOpen(false);
+  };
+
+  const handleUserUpdated = () => {
+    loadUsers();
   };
 
   return (
@@ -158,6 +169,14 @@ function UserManagement() {
           onSubmit={(groupIds) => handleUpdateUserGroups(selectedUser.id, groupIds)}
         />
       )}
+
+      <UserDetails
+        isOpen={isUserDetailsModalOpen}
+        onClose={() => setIsUserDetailsModalOpen(false)}
+        userId={selectedUserId}
+        onUserDeleted={handleUserDeleted}
+        onUserUpdated={handleUserUpdated}
+      />
     </>
   );
 }

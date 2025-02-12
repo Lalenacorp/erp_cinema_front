@@ -16,8 +16,9 @@ import Login from './pages/Login';
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
 import SetPassword from './pages/SetPassword';
+import GroupManagement from './pages/GroupManagement';
 import { authService } from './services/authService';
-import UserDetails from './components/UserDetails';
+
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate();
@@ -32,6 +33,8 @@ function PrivateRoute({ children }: { children: React.ReactNode }) {
         navigate('/login');
       }
     };
+
+    
     
     checkAuth();
   }, [navigate]);
@@ -73,7 +76,7 @@ function App() {
         <Route path="/utilisateurs" element={<PrivateRoute><UserManagement /></PrivateRoute>} />
         <Route path="/parametres" element={<PrivateRoute><Parametres /></PrivateRoute>} />
         <Route path="/profile" element={<PrivateRoute><Profile /></PrivateRoute>} />
-        <Route path="/users/:id" element={<UserDetails />} />
+        <Route path="/groupes" element={<PrivateRoute><GroupManagement /></PrivateRoute>} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Router>

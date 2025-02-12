@@ -6,7 +6,8 @@ import { authService } from '../services/authService';
 function ResetPassword() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const token = searchParams.get('token');
+  const uid = searchParams.get('uid'); // Récupère l'uid de l'URL
+  const token = searchParams.get('token'); // Récupère le token de l'URL
 
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -14,16 +15,18 @@ function ResetPassword() {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  useEffect(() => {
-    if (!token) {
+/*   useEffect(() => {
+    // Si l'uid ou le token est manquant, redirige vers la page de login
+    if (!uid || !token) {
       navigate('/login');
     }
-  }, [token, navigate]);
+  }, [uid, token, navigate]); */
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
+    // Vérification des mots de passe
     if (password !== confirmPassword) {
       setError('Les mots de passe ne correspondent pas');
       return;
@@ -36,7 +39,8 @@ function ResetPassword() {
 
     setIsLoading(true);
     try {
-      await authService.resetPassword(token!, password);
+      // Envoi de la requête au backend
+      await authService.resetPassword(uid!, token!, password);
       navigate('/login', { state: { message: 'Votre mot de passe a été réinitialisé avec succès' } });
     } catch (error: any) {
       setError(error.message || 'Une erreur est survenue');
