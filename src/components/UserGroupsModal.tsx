@@ -73,18 +73,17 @@ const UserGroupsModal: React.FC<UserGroupsModalProps> = ({
       return newSelection;
     });
   };
+
   const handleSubmit = async () => {
     try {
-      // Vous passez un objet avec `userId` et `groupIds` (c'est ce que la fonction attend)
-      await authService.updateUserGroups({ userId, groupIds: selectedGroups });
-      onSubmit(selectedGroups); // Traitez les groupes après la mise à jour
-      onClose(); // Fermez la modal
+      await authService.assignUserGroups({ userId, groupId: selectedGroups });
+      onSubmit(selectedGroups);
+      onClose();
     } catch (err: any) {
       console.error('❌ Erreur lors de la mise à jour des groupes:', err.message);
-      setError('Erreur lors de la mise à jour des groupes'); // Gérez l'erreur
+      setError('Erreur lors de la mise à jour des groupes');
     }
   };
-  
 
   if (!isOpen) return null;
 

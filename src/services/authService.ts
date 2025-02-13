@@ -1,5 +1,5 @@
 import { api } from '../lib/api'; // Assurez-vous que cette importation est correcte
-import type { User, AuthTokens, LoginRequest, Group } from '../types';
+import type { User, AuthTokens, LoginRequest, Group, Permission } from '../types';
 import { jwtDecode } from 'jwt-decode';  // Correction de l'importation de jwt-decode
 
 
@@ -351,53 +351,108 @@ async deleteUser(userId: string): Promise<void> {
     }
   },
 
+
 // Mettre à jour les groupes d'un utilisateur
-async updateUserGroups({ userId, groupIds }: { userId: string; groupIds: string[] }): Promise<void> {
+async assignUserGroups({ userId, groupId }: { userId: string; groupId: string[] }): Promise<void> {
   try {
     const token = this.getToken();
     
     if (!token) {
-      throw new Error("❌ Token manquant !");
+      throw new Error("Token manquant !");
     }
 
-    if (!groupIds.length) {
-      throw new Error("❌ Aucun groupe sélectionné !");
+    if (!groupId || groupId.length === 0) { // Vérification améliorée
+      throw new Error("Aucun groupe sélectionné !");
     }
+
+    // Récupérer les détails du groupe pour avoir son nom
+    const group = await this.getGroupById(groupId[0]);
+
+    console.log("📝 Données envoyées:", {
+      userId,
+      group: group?.name,
+      url: `http://13.38.119.12/api/users/${userId}/assign_group/`
+    });
 
     const response = await fetch(`http://13.38.119.12/api/users/${userId}/assign_group/`, {
-      method: 'POST', // Change en 'PATCH' ou 'PUT' si nécessaire
+      method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${token}`,
       },
-      body: JSON.stringify({ group_ids: groupIds }), // Change en { groups: groupIds } si nécessaire
+      body: JSON.stringify({ group: group?.name }), // Vérification sécurisée avec "?"
     });
 
-    const responseData = await response.json(); // Récupérer la réponse du backend
+    // Log de la réponse brute pour le débogage
+    console.log("📡 Réponse brute:", response);
+
+    const responseData = await response.json();
+    console.log("📡 Réponse détaillée:", responseData);
 
     if (!response.ok) {
-      console.error("❌ Erreur API:", responseData);
-      throw new Error(`Erreur API: ${responseData.detail || "Mise à jour échouée"}`);
+      console.error("❌ Erreur détaillée:", responseData);
+      throw new Error(responseData.error || "Mise à jour échouée");
     }
 
-    console.log("✅ Groupes mis à jour avec succès :", responseData);
+    console.log("✅ Groupes mis à jour avec succès:", responseData);
   } catch (error: any) {
-    console.error("❌ Erreur lors de la mise à jour des groupes:", error.message);
-    throw error;
+    console.error("❌ Erreur lors de la mise à jour des groupes:", error);
+    throw new Error(error.message || "Erreur lors de la mise à jour des groupes");
   }
 },
 
- // Gestion des groupes
- async getGroupById(groupId: string): Promise<Group> {
+// Récupérer un groupe par son ID
+async getGroupById(groupId: string): Promise<Group> {
   try {
-    const response = await api.get(`/api/groups/${groupId}`);
-    return response.data;
-  } catch (error) {
-    console.error('Erreur lors de la récupération du groupe:', error);
+    const token = this.getToken();
+    
+    if (!token) {
+      throw new Error("Token manquant !");
+    }
+
+    // Convert groupId to number si nécessaire
+    const numericGroupId = parseInt(groupId, 10);
+    
+    if (isNaN(numericGroupId)) {
+      throw new Error("ID de groupe invalide");
+    }
+
+    console.log(`🔍 Récupération du groupe ${numericGroupId}`);
+
+    const response = await fetch(`http://13.38.119.12/api/groups/${numericGroupId}/`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      const data = await response.json();
+      console.error(`❌ Erreur HTTP ${response.status}:`, data);
+      throw new Error(data.error || `Erreur HTTP: ${response.status}`);
+    }
+
+    const data = await response.json();
+    console.log(`📡 Réponse pour le groupe ${numericGroupId}:`, data);
+    
+    // Vérification de la structure des données retournées
+    if (!data.id || !data.name) {
+      throw new Error("Données du groupe invalides !");
+    }
+
+    const group: Group = {
+      id: data.id,
+      name: data.name,
+      permissions: Array.isArray(data.permissions) ? data.permissions : []
+    };
+
+    return group;
+  } catch (error: any) {
+    console.error(`❌ Erreur lors de la récupération du groupe ${groupId}:`, error);
     throw error;
   }
 },
-
 // Création d'un groupe
 async createGroup(name: string): Promise<Group> {
   try {
@@ -420,12 +475,42 @@ async updateGroup(groupId: string, name: string): Promise<Group> {
   }
 },
 
+// Récupérer les permissions d'un groupe
+async getGroupPermissions(groupId: string): Promise<Permissions[]> {
+  try {
+    const token = this.getToken();
+    
+    if (!token) {
+      throw new Error("Token manquant !");
+    }
 
+    const response = await fetch(`http://13.38.119.12/api/groups/${groupId}/`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+    });
 
-async updateGroupPermissions(groupId: string, permissionIds: string[]): Promise<Group> {
+    const responseData = await response.json();
+
+    if (!response.ok) {
+      console.error("❌ Erreur API:", responseData);
+      throw new Error(`Erreur API: ${responseData.detail || "Récupération des permissions échouée"}`);
+    }
+
+    console.log("✅ Permissions récupérées avec succès :", responseData.permissions);
+    return responseData.permissions;
+  } catch (error: any) {
+    console.error("❌ Erreur lors de la récupération des permissions:", error.message);
+    throw error;
+  }
+},
+
+async updateGroupPermissions(groupId: string, permissions: number[]): Promise<Group> {
   try {
     const response = await api.post(`/api/group/${groupId}/update_permissions/`, {
-      permission_ids: permissionIds
+      permissions: permissions
     });
 
     console.log('Réponse complète API mise à jour permissions:', response);

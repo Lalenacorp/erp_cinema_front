@@ -27,7 +27,7 @@ function GroupManagement() {
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
   const [isPermissionsModalOpen, setIsPermissionsModalOpen] = useState(false);
   const [permissions, setPermissions] = useState<Permission[]>([]); // Stocker la liste des permissions
-  const [selectedPermissions, setSelectedPermissions] = useState<string[]>([]); // Permissions sélectionnées
+  const [selectedPermissions, setSelectedPermissions] = useState<number[]>([]); // Permissions sélectionnées
   const [isEditGroupModalOpen, setIsEditGroupModalOpen] = useState(false);
   
 
@@ -54,7 +54,7 @@ function GroupManagement() {
         }
     
         // Effectuer la requête pour récupérer les permissions en incluant le token dans les en-têtes
-        const response = await fetch('http://13.38.119.12/api/permissions', {
+        const response = await fetch('http://13.38.119.12/api/permissions/', {
           method: 'GET',
           headers: {
             'Authorization': `Bearer ${token}`, // En-tête d'authentification
@@ -146,11 +146,12 @@ function GroupManagement() {
     setIsPermissionsModalOpen(true); // Ouvrir le modal pour gérer les permissions
   };
 
-  const handlePermissionToggle = (permissionCodename: string) => {
+  const handlePermissionToggle = (permissionIds: number) => {
+    console.log("permission recupére", permissionIds)
     setSelectedPermissions((prevSelected) =>
-      prevSelected.includes(permissionCodename)
-        ? prevSelected.filter((codename) => codename !== permissionCodename)
-        : [...prevSelected, permissionCodename]
+      prevSelected.includes(permissionIds)
+        ? prevSelected.filter((id) => id !== permissionIds)
+        : [...prevSelected, permissionIds]
     );
   };
 
@@ -259,44 +260,44 @@ function GroupManagement() {
 
       {/* Modal pour gérer les permissions */}
      {/* Modal pour gérer les permissions */}
-{isPermissionsModalOpen && (
-  <div className="fixed inset-0 flex justify-center items-center bg-gray-500 bg-opacity-50 z-50">
-    <div className="bg-white p-6 rounded-lg w-96">
-      <h2 className="text-xl font-semibold mb-4">Gérer les Permissions du Groupe</h2>
-      {/* Liste des permissions */}
-      <div className="grid grid-cols-2 gap-4">
-        {permissions.map((permission) => (
-          <div key={permission.id} className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              id={permission.codename}
-              checked={selectedPermissions.includes(permission.codename)}
-              onChange={() => handlePermissionToggle(permission.codename)}
-              className="form-checkbox"
-            />
-            <label htmlFor={permission.codename} className="text-gray-700">
-              {permission.name}
-            </label>
+     {isPermissionsModalOpen && (
+        <div className="fixed inset-0 flex justify-center items-center bg-gray-500 bg-opacity-50 z-50">
+          <div className="bg-white p-6 rounded-lg w-96">
+            <h2 className="text-xl font-semibold mb-4">Gérer les Permissions du Groupe</h2>
+            <div className="grid grid-cols-2 gap-4">
+              {permissions.map((permission) => (
+                <div key={permission.id} className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id={`permission-${permission.id}`}
+                    checked={selectedPermissions.includes(permission.id)}
+                    onChange={() => handlePermissionToggle(permission.id)}
+                    className="form-checkbox"
+                  />
+                  <label htmlFor={`permission-${permission.id}`} className="text-gray-700">
+                    {permission.name}
+                  </label>
+                </div>
+              ))}
+            </div>
+            <div className="mt-4 flex justify-end gap-4">
+              <button
+                onClick={() => setIsPermissionsModalOpen(false)}
+                className="bg-gray-500 text-white px-4 py-2 rounded-md"
+              >
+                Annuler
+              </button>
+              <button
+                onClick={handleSavePermissions}
+                className="bg-blue-600 text-white px-4 py-2 rounded-md"
+              >
+                Sauvegarder
+              </button>
+            </div>
           </div>
-        ))}
-      </div>
-      <div className="mt-4 flex justify-end gap-4">
-        <button
-          onClick={() => setIsPermissionsModalOpen(false)} // Fermer le modal
-          className="bg-gray-500 text-white px-4 py-2 rounded-md"
-        >
-          Annuler
-        </button>
-        <button
-          onClick={handleSavePermissions} // Sauvegarder les permissions
-          className="bg-blue-600 text-white px-4 py-2 rounded-md"
-        >
-          Sauvegarder
-        </button>
-      </div>
-    </div>
-  </div>
-)}
+        </div>
+      )}
+    
 
 
     </div>

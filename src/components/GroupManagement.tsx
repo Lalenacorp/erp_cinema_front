@@ -45,20 +45,20 @@ export const groupManagement = {
     }
   },
 
-  // Mettre à jour les groupes d'un utilisateur
-  async updateUserGroups({ userId, groupIds }: { userId: string; groupIds: string[] }) {
+ /*  // Mettre à jour les groupes d'un utilisateur
+  async assigneUserGroups({ userId, groupIds }: { userId: string; groupIds: string[] }) {
     try {
-      await authService.updateUserGroups({ userId, groupIds });
+      await authService.assignUserGroups({ userId, groupIds });
     } catch (error) {
       console.error('Erreur lors de la mise à jour des groupes de l\'utilisateur:', error);
       throw error;
     }
   },
-
+ */
   // Mettre à jour les permissions d'un groupe
-  async updateGroupPermissions(groupId: string, permissionIds: string[]) {
+  async updateGroupPermissions(groupId: string, permissions: number[]) {
     try {
-      const response = await authService.updateGroupPermissions(groupId, permissionIds);
+      const response = await authService.updateGroupPermissions(groupId, permissions);
       return response;
     } catch (error) {
       console.error('Erreur lors de la mise à jour des permissions du groupe:', error);

@@ -54,9 +54,9 @@ function UserManagement() {
     }
   };
 
-  const handleUpdateUserGroups = async (userId: string, groupIds: string[]) => {
+  const handleUpdateUserGroups = async (userId: string, groupId: string[]) => {
     try {
-      await authService.updateUserGroups({ userId, groupIds });
+      await authService.assignUserGroups({ userId, groupId });
       loadUsers();
     } catch (error) {
       console.error('Erreur lors de la mise à jour des groupes de l\'utilisateur:', error);
