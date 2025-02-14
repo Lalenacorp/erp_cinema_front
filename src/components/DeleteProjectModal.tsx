@@ -6,13 +6,15 @@ interface DeleteProjectModalProps {
   onClose: () => void;
   onConfirm: () => void;
   projectName: string;
+  isLoading?: boolean;
 }
 
 const DeleteProjectModal: React.FC<DeleteProjectModalProps> = ({
   isOpen,
   onClose,
   onConfirm,
-  projectName
+  projectName,
+  isLoading = false
 }) => {
   if (!isOpen) return null;
 
@@ -21,7 +23,11 @@ const DeleteProjectModal: React.FC<DeleteProjectModalProps> = ({
       <div className="bg-white rounded-xl w-full max-w-md p-6">
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-2xl font-bold text-red-600">Supprimer le projet</h2>
-          <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
+          <button 
+            onClick={onClose} 
+            className="text-gray-500 hover:text-gray-700"
+            disabled={isLoading}
+          >
             <X className="w-6 h-6" />
           </button>
         </div>
@@ -47,16 +53,25 @@ const DeleteProjectModal: React.FC<DeleteProjectModalProps> = ({
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg"
+            disabled={isLoading}
+            className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg disabled:opacity-50"
           >
             Annuler
           </button>
           <button
             type="button"
             onClick={onConfirm}
-            className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+            disabled={isLoading}
+            className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 flex items-center gap-2"
           >
-            Supprimer le projet
+            {isLoading ? (
+              <>
+                <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></span>
+                Suppression...
+              </>
+            ) : (
+              'Supprimer le projet'
+            )}
           </button>
         </div>
       </div>

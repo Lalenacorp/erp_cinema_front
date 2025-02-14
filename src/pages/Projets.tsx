@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react'; 
 import { useNavigate } from 'react-router-dom';
 import { Plus, Search, ExternalLink } from 'lucide-react';
 import NewProjectModal from '../components/NewProjectModal';
@@ -10,9 +10,10 @@ function Projets() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [isNewProjectModalOpen, setIsNewProjectModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [error, setError] = useState<string | null>(null);
 
   // Charger les projets au montage du composant
-  React.useEffect(() => {
+  useEffect(() => {
     loadProjects();
   }, []);
 
@@ -20,8 +21,10 @@ function Projets() {
     try {
       const data = await projectService.getProjects();
       setProjects(data);
+      setError(null); // Réinitialiser l'erreur en cas de succès
     } catch (error) {
       console.error('Erreur lors du chargement des projets:', error);
+      setError('Erreur lors du chargement des projets');
     }
   };
 
@@ -32,6 +35,7 @@ function Projets() {
       setIsNewProjectModalOpen(false);
     } catch (error) {
       console.error('Erreur lors de la création du projet:', error);
+      setError('Erreur lors de la création du projet');
     }
   };
 
@@ -83,8 +87,8 @@ function Projets() {
   };
 
   const filteredProjects = projects.filter(project =>
-    project.nom.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    project.description.toLowerCase().includes(searchQuery.toLowerCase())
+    (project.name && project.name.toLowerCase().includes(searchQuery.toLowerCase())) ||
+    (project.description && project.description.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
   return (
@@ -115,10 +119,12 @@ function Projets() {
           />
         </div>
 
+        {error && <div className="mb-4 text-red-600">{error}</div>}
+
         <div className="grid grid-cols-1 gap-6">
           {filteredProjects.map((project) => {
-            const totalSpent = project.depenses.reduce((sum, depense) => sum + depense.montant, 0);
-            const budgetVariance = calculateBudgetVariance(project.budget.montantTotal || 0, totalSpent);
+            const totalSpent = project.depenses?.reduce((sum, depense) => sum + depense.montant, 0) || 0;
+            const budgetVariance = calculateBudgetVariance(project.budget || 0, totalSpent);
 
             return (
               <div
@@ -127,11 +133,11 @@ function Projets() {
               >
                 <div className="flex justify-between items-start mb-4">
                   <div>
-                    <h2 className="text-xl font-semibold mb-2">{project.nom}</h2>
+                    <h2 className="text-xl font-semibold mb-2">{project.name}</h2>
                     <p className="text-gray-600">{project.description}</p>
                   </div>
-                  <span className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(project.statut)}`}>
-                    {project.statut}
+                  <span className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(project.status)}`}>
+                    {project.status}
                   </span>
                 </div>
 
@@ -139,7 +145,7 @@ function Projets() {
                   <div>
                     <p className="text-sm text-gray-500 mb-1">Budget</p>
                     <div className="flex items-center gap-2">
-                      <p className="font-semibold">{formatBudget(project.budget.montantTotal || 0)}</p>
+                      <p className="font-semibold">{formatBudget(project.budget || 0)}</p>
                       <span className={`text-sm ${budgetVariance.isPositive ? 'text-green-600' : 'text-red-600'}`}>
                         ({budgetVariance.isPositive ? '+' : '-'} {budgetVariance.formatted})
                       </span>
@@ -148,7 +154,7 @@ function Projets() {
                   <div>
                     <p className="text-sm text-gray-500 mb-1">Période</p>
                     <p className="font-semibold">
-                      {formatDate(project.dateDebut)} - {formatDate(project.dateFin)}
+                      {/* {formatDate(new Date(project.dateDebut))} - {formatDate(new Date(project.dateFin))} */}
                     </p>
                   </div>
                   <div>
@@ -157,11 +163,11 @@ function Projets() {
                       <div className="flex-1 h-2 bg-gray-200 rounded-full">
                         <div
                           className="h-2 bg-blue-600 rounded-full"
-                          style={{ width: `${project.activites?.length ? (project.activites.filter(a => a.statut === 'Terminée').length / project.activites.length) * 100 : 0}%` }}
+                          style={{ width: `${project.activites?.filter(a => a.statut === 'Terminée').length / (project.activites?.length || 1) * 100}%` }}
                         />
                       </div>
                       <span className="text-sm font-medium">
-                        {project.activites?.length ? Math.round((project.activites.filter(a => a.statut === 'Terminée').length / project.activites.length) * 100) : 0}%
+                        {Math.round((project.activites?.filter(a => a.statut === 'Terminée').length || 0) / (project.activites?.length || 1) * 100)}%
                       </span>
                     </div>
                   </div>

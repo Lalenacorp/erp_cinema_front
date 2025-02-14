@@ -1,6 +1,6 @@
-import { api } from '../lib/api'; // Assurez-vous que cette importation est correcte
+import { api } from '../lib/api'; 
 import type { User, AuthTokens, LoginRequest, Group, Permission } from '../types';
-import { jwtDecode } from 'jwt-decode';  // Correction de l'importation de jwt-decode
+import { jwtDecode } from 'jwt-decode';  
 
 
 export const authService = {

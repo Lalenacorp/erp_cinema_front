@@ -67,30 +67,90 @@ export interface TokenRefreshRequest {
 
 export type StatutActivite = 'En cours' | 'Terminée' | 'En attente';
 
-export interface SousActivite {
-  id: string; // UUID
-  nom: string;
-  description: string;
-  montantPrevu: number;
-  montantDepense: number;
-  dateDebut?: string; // Format ISO 8601
-  dateFin?: string;   // Format ISO 8601
-  statut: StatutActivite;
-  createdBy: User;
-  createdAt: string; // Format ISO 8601
+
+
+// Modèle pour un Projet
+export interface Project {
+  id: number;
+  name: string;
+  description: string | null;
+  created_at: string; // Date ISO 8601
+  updated_at: string; // Date ISO 8601
+  dateDebut: string;
+  status?: "prepa" | "pre-prod" | "prod" | "post-prod";
+  budget: string; // Montant en format string (pour les chiffres de type '3000000.00')
+  current_expenses: string | null; // Dépenses actuelles, ou null si non spécifié
+  budget_gap: string | null; // Écart de budget, ou null si non spécifié
+  currency: string; // Devise, exemple: 'Euro'
+  exchange_rate: string; // Taux de change, exemple: '0.00'
+  managed_by: number; // ID de l'utilisateur qui gère le projet
+  activites: Activity[]; // Liste des activités
 }
 
-export interface Activite {
-  id: string; // UUID
-  projetId: string; // UUID
-  nom: string;
+// Modèle pour la création d'un projet
+export interface CreateProjectRequest {
+  name: string;
+  budget: number; // Montant du budget
+  status: "prepa" | "pre-prod" | "prod" | "post-prod";
+  managed_by: number; // ID de l'utilisateur qui gère le projet
+}
+
+// Modèle pour la réponse après la création d'un projet
+export interface CreateProjectResponse extends Project {}
+
+// Modèle pour la mise à jour d'un projet
+export interface UpdateProjectRequest {
+  name?: string;
+  description?: string;
+  status?: "prepa" | "pre-prod" | "prod" | "post-prod";
+  
+}
+
+
+
+// Modèle pour la réponse après la mise à jour d'un projet
+export interface UpdateProjectResponse extends Project {}
+
+// Modèle pour la réponse à la suppression d'un projet
+export interface DeleteProjectResponse {
+  status: number; // 204 NO CONTENT
+}
+
+// Modèle pour la réponse de la liste des projets
+export interface ListProjectsResponse {
+  projects: Project[];  // Contient un tableau d'objets Project
+}
+
+// Modèle pour la réponse d'un projet spécifique
+export interface ProjectDetailResponse extends Project {}
+
+// Modèle pour une Activité
+export interface Activity {
+  id: number;
+  activity_subactivity: any[]; // Liste des sous-activités (pour l'instant vide)
+  activity_manager: string; // Responsable de l'activité
+  name: string;
+  description: string | null; // Description de l'activité
+  created_at: string; // Date de création de l'activité
+  updated_at: string; // Date de mise à jour de l'activité
+  total_amount_estimated: string | null; // Montant total estimé
+  total_amount_spent: string | null; // Montant total dépensé
+  activity_gap: string | null; // Écart entre estimé et dépensé
+  project: number; // ID du projet auquel l'activité appartient
+  managed_by: number; // ID de l'utilisateur qui gère l'activité
+}
+
+export interface SubActivity {
+  id: number;
+  activity: number; // ID de l'activité à laquelle la sous-activité est associée
+  name: string;
   description: string;
-  montantTotal: number;
-  montantDepense: number;
+  amount_estimated: number; // Montant estimé pour la sous-activité
+  amount_spent: number;     // Montant dépensé jusqu'à présent pour la sous-activité
+  subactivity_gap: number;  // Différence entre le montant estimé et le montant dépensé
+  created_at: string;       // Date de création de la sous-activité
+  updated_at: string;       // Dernière date de mise à jour
   dateDebut?: string; // Format ISO 8601
   dateFin?: string;   // Format ISO 8601
-  statut: StatutActivite;
-  sousActivites: SousActivite[];
-  createdBy: User;
-  createdAt: string; // Format ISO 8601
+
 }

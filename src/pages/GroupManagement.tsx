@@ -1,11 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Edit, Trash, Lock } from 'lucide-react'; 
 import { groupManagement } from '../components/GroupManagement'; 
-import { api } from '../lib/api'; 
 import CreateGroupModal from '../components/CreateGroupModal';
 import EditGroupModal from '../components/EditGroupModal';
 
-// Définir le type ou l'interface pour Group
+
 interface Group {
   id: string;
   name: string;

@@ -1,37 +1,57 @@
 import React, { useState, useEffect } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { Calendar, Clock, Film, Users } from 'lucide-react';
-import { projectService } from '../services/projectService';
-import type { Project } from '../types';
 
 function Dashboard() {
-  const [projects, setProjects] = useState<Project[]>([]);
+  // Données statiques pour les projets
+  const [projects, setProjects] = useState([
+    {
+      name: 'Projet A',
+      status: 'En cours',
+      dateDebut: new Date('2024-01-01'),
+      dateFin: new Date('2024-06-30'),
+      budget: 100000,
+      current_expenses: 50000,
+      intervenants: ['Alice', 'Bob'],
+      activites: [{ dateDebut: new Date('2024-03-01'), description: 'Planification' }],
+      depenses: [{ date: new Date('2024-03-15'), montant: 50000 }],
+    },
+    {
+      name: 'Projet B',
+      status: 'En cours',
+      dateDebut: new Date('2024-02-01'),
+      dateFin: new Date('2024-07-31'),
+      budget: 120000,
+      current_expenses: 30000,
+      intervenants: ['Charlie', 'David'],
+      activites: [{ dateDebut: new Date('2024-04-01'), description: 'Écriture du script' }],
+      depenses: [{ date: new Date('2024-04-05'), montant: 30000 }],
+    },
+    {
+      name: 'Projet C',
+      status: 'Terminé',
+      dateDebut: new Date('2023-06-01'),
+      dateFin: new Date('2023-12-31'),
+      budget: 80000,
+      current_expenses: 80000,
+      intervenants: ['Eva', 'Frank'],
+      activites: [{ dateDebut: new Date('2023-08-01'), description: 'Montage final' }],
+      depenses: [{ date: new Date('2023-12-10'), montant: 80000 }],
+    },
+  ]);
 
   useEffect(() => {
-    loadProjects();
+    // En attendant de charger les projets dynamiquement, on utilise les données statiques
   }, []);
-
-  const loadProjects = async () => {
-    try {
-      const data = await projectService.getProjects();
-      setProjects(data);
-    } catch (error) {
-      console.error('Erreur lors du chargement des projets:', error);
-    }
-  };
 
   // Calcul des statistiques des projets
   const totalProjects = projects.length;
-  const activeProjects = projects.filter(p => p.statut !== 'Terminé').length;
-  const totalTeamMembers = projects.reduce((total, project) => 
-    total + project.intervenants.length, 0
-  );
+  const activeProjects = projects.filter(p => p.status !== 'Terminé').length;
   const upcomingDeadlines = projects.filter(p => {
     const daysUntilEnd = Math.ceil((p.dateFin.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
     return daysUntilEnd > 0 && daysUntilEnd <= 7;
   }).length;
 
-  // Calcul du temps moyen par projet (en mois)
   const averageProjectDuration = projects.length > 0 
     ? projects.reduce((total, project) => {
         const duration = Math.ceil((project.dateFin.getTime() - project.dateDebut.getTime()) / (1000 * 60 * 60 * 24 * 30));
@@ -41,15 +61,15 @@ function Dashboard() {
 
   // Données pour le graphique Budget vs Dépenses
   const budgetData = projects.slice(0, 3).map(project => ({
-    name: project.nom,
-    budget: project.budget.montantTotal,
-    depense: project.budget.montantDepense || 0
+    name: project.name,
+    budget: project.budget,
+    depense: project.current_expenses || 0
   }));
 
   // Données pour le graphique Statut des Projets
   const statusData = Object.entries(
     projects.reduce((acc, project) => {
-      acc[project.statut] = (acc[project.statut] || 0) + 1;
+      acc[project.status] = (acc[project.status] || 0) + 1;
       return acc;
     }, {} as Record<string, number>)
   ).map(([name, value]) => ({ name, value }));
@@ -90,7 +110,6 @@ function Dashboard() {
           </div>
           <h3 className="text-gray-500 text-sm font-medium">Membres de l'équipe</h3>
           <div className="flex items-end justify-between mt-1">
-            <p className="text-2xl font-semibold">{totalTeamMembers}</p>
             <p className="text-green-500 text-sm font-medium">Équipe totale</p>
           </div>
         </div>
@@ -197,7 +216,7 @@ function Dashboard() {
             return (
               <div key={index} className="flex items-center justify-between py-3 border-b last:border-0">
                 <div>
-                  <p className="font-medium">{project.nom}</p>
+                  <p className="font-medium">{project.name}</p>
                   <p className="text-sm text-gray-500">{action}</p>
                 </div>
                 <div className="text-right">

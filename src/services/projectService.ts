@@ -1,240 +1,320 @@
-import type { Project, Activite, Depense } from '../types';
-import { storage } from '../lib/storage';
-import { authService } from './authService';
+import { Project, Activity, SubActivity } from '../types';
+import { api } from '../lib/api'; // Assurez-vous que cette importation soit utilisée correctement.
 
 export const projectService = {
+
+  baseUrl: 'http://13.38.119.12', // L'URL de base de l'API
+
+  // Récupère le token de la personne connectée
+  getToken(): string | null {
+    return localStorage.getItem('auth_token');
+  },
+
+  
+  // Liste tous les projets
   async getProjects(): Promise<Project[]> {
-    const data = storage.getData();
-    return data.projects.map(project => ({
+    const token = this.getToken();
+
+    if (!token) {
+      throw new Error("Token manquant !");
+    }
+
+    const response = await fetch(`${this.baseUrl}/api/erp/list_projects/`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error("Échec de la récupération des projets");
+    }
+
+    const data = await response.json();
+
+    // Vérification que data est un tableau
+    if (!Array.isArray(data)) {
+      throw new Error("La réponse de l'API n'est pas un tableau de projets");
+    }
+
+    // Traiter et retourner les projets
+    return data.map((project: any) => ({
       ...project,
-      budget: {
-        ...project.budget,
-        montantDepense: project.depenses.reduce((sum, d) => sum + d.montant, 0)
-      }
+      budget: parseFloat(project.budget) || 0,  // Convertir budget en nombre
+      current_expenses: project.current_expenses ? parseFloat(project.current_expenses) : 0,  // Gérer current_expenses
+      budget_gap: project.budget_gap ? parseFloat(project.budget_gap) : 0,  // Gérer budget_gap
+      description: project.description || "",  // Si description est null, la remplacer par une chaîne vide
     }));
   },
 
-  async getProjectById(id: string): Promise<Project | null> {
-    const data = storage.getData();
-    const project = data.projects.find(p => p.id === id);
-    if (!project) return null;
+  // Crée un projet
+  async createProject(project: Omit<Project, 'id' | 'created_at' | 'updated_at'>): Promise<Project> {
+    const token = this.getToken();
+    
+    if (!token) {
+      throw new Error("Token manquant !");
+    }
 
-    // Calculer le montant total dépensé
-    const montantDepense = project.depenses.reduce((sum, d) => sum + d.montant, 0);
-
-    // Mettre à jour les montants dépensés des activités et sous-activités
-    const activitesWithExpenses = project.activites.map(activity => {
-      const sousActivitesWithExpenses = activity.sousActivites.map(sa => ({
-        ...sa,
-        montantDepense: project.depenses
-          .filter(d => d.sousActiviteId === sa.id)
-          .reduce((sum, d) => sum + d.montant, 0)
-      }));
-
-      const activityMontantDepense = sousActivitesWithExpenses
-        .reduce((sum, sa) => sum + sa.montantDepense, 0);
-
-      return {
-        ...activity,
-        montantDepense: activityMontantDepense,
-        sousActivites: sousActivitesWithExpenses
-      };
+    const response = await fetch(`${this.baseUrl}/api/erp/create_project/`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        name: project.name,
+        budget: project.budget,
+        status: project.status,
+        managed_by: project.managed_by,
+      })
     });
 
+    if (!response.ok) {
+      throw new Error("Échec de la création du projet");
+    }
+
+    const newProject = await response.json();
     return {
-      ...project,
-      activites: activitesWithExpenses,
-      budget: {
-        ...project.budget,
-        montantDepense
-      }
+      ...newProject,
+      budget: parseFloat(newProject.budget),
+      current_expenses: newProject.current_expenses ? parseFloat(newProject.current_expenses) : null,
+      budget_gap: newProject.budget_gap ? parseFloat(newProject.budget_gap) : null,
     };
   },
 
-  async createProject(project: Omit<Project, 'id'>): Promise<Project> {
-    const data = storage.getData();
-    const currentUser = await authService.getCurrentUser();
-    if (!currentUser) {
-      throw new Error('Utilisateur non connecté');
+  // Récupère les détails d'un projet par son ID
+  async getProjectDetails(id: string | number): Promise<Project> {
+    const token = this.getToken();
+    if (!token) {
+      throw new Error("Token manquant !");
     }
 
-    const newProject: Project = {
-      ...project,
-      id: crypto.randomUUID(),
-      activites: [],
-      depenses: [],
-      intervenants: [],
-      budget: {
-        ...project.budget,
-        montantTotal: project.budget.montantTotal || 0,
-        montantDepense: 0,
-        activites: [],
-        calculerTotal: () => project.budget.montantTotal || 0
+    const response = await fetch(`${this.baseUrl}/api/erp/project/${id}/`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
       }
-    };
+    });
 
-    data.projects.push(newProject);
-    storage.setData(data);
-    return newProject;
+    if (!response.ok) {
+      throw new Error("Échec de la récupération des détails du projet");
+    }
+
+    const data = await response.json();
+    return {
+      ...data,
+      budget: {
+        montantTotal: parseFloat(data.budget) || 0,
+        montantDepense: data.current_expenses ? parseFloat(data.current_expenses) : 0,
+        ecart: data.budget_gap ? parseFloat(data.budget_gap) : 0,
+      },
+      subActivities: [], // Initialize empty array for subactivities
+    };
   },
 
-  async updateProject(id: string, updatedProject: Partial<Project>): Promise<Project> {
-    const data = storage.getData();
-    const index = data.projects.findIndex(p => p.id === id);
-    if (index === -1) {
-      throw new Error('Projet non trouvé');
-    }
+  // Met à jour un projet
+  async updateProject(id: number, updatedData: Partial<Project>): Promise<Project> {
+    const token = this.getToken();
     
-    const currentProject = data.projects[index];
-    const montantDepense = currentProject.depenses.reduce((sum, d) => sum + d.montant, 0);
+    if (!token) {
+      throw new Error("Token manquant !");
+    }
 
-    data.projects[index] = {
-      ...currentProject,
+    const response = await fetch(`${this.baseUrl}/api/erp/project/update_project/${id}/`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify(updatedData),
+    });
+
+    if (!response.ok) {
+      throw new Error("Échec de la mise à jour du projet");
+    }
+
+    const updatedProject = await response.json();
+    return {
       ...updatedProject,
-      id,
-      budget: {
-        ...currentProject.budget,
-        ...updatedProject.budget,
-        montantDepense
-      }
+      budget: parseFloat(updatedProject.budget),
+      current_expenses: updatedProject.current_expenses ? parseFloat(updatedProject.current_expenses) : null,
+      budget_gap: updatedProject.budget_gap ? parseFloat(updatedProject.budget_gap) : null,
     };
+  },
+
+  // Supprime un projet
+  async deleteProject(id: number): Promise<void> {
+    const token = this.getToken();
     
-    storage.setData(data);
-    return data.projects[index];
-  },
-
-  async deleteProject(id: string): Promise<void> {
-    const data = storage.getData();
-    data.projects = data.projects.filter(p => p.id !== id);
-    storage.setData(data);
-  },
-
-  async addActivity(projectId: string, activity: Omit<Activite, 'id'>): Promise<Activite> {
-    const data = storage.getData();
-    const project = data.projects.find(p => p.id === projectId);
-    if (!project) {
-      throw new Error('Projet non trouvé');
+    if (!token) {
+      throw new Error("Token manquant !");
     }
 
-    const currentUser = await authService.getCurrentUser();
-    if (!currentUser) {
-      throw new Error('Utilisateur non connecté');
+    const response = await fetch(`${this.baseUrl}/api/erp/delete_project/${id}/`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error("Échec de la suppression du projet");
+    }
+  },
+
+  // Crée une nouvelle activité pour un projet spécifique
+  async createActivity(projectId: number, name: string, managedBy: number): Promise<Activity> {
+    const token = this.getToken();
+    
+    if (!token) {
+      throw new Error("Token manquant !");
     }
 
-    const newActivity: Activite = {
-      ...activity,
-      id: crypto.randomUUID(),
-      montantDepense: 0,
-      createdBy: currentUser,
-      createdAt: new Date(),
-      sousActivites: activity.sousActivites.map(sa => ({
-        ...sa,
-        id: crypto.randomUUID(),
-        montantDepense: 0,
-        createdBy: currentUser,
-        createdAt: new Date()
-      }))
-    };
+    const response = await fetch(`${this.baseUrl}/api/erp/project/${projectId}/create_activity/`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        project: projectId,
+        name: name,
+        managed_by: managedBy,
+      })
+    });
 
-    project.activites.push(newActivity);
-    storage.setData(data);
+    if (!response.ok) {
+      throw new Error("Échec de la création de l'activité");
+    }
+
+    const newActivity = await response.json();
     return newActivity;
   },
 
-  async addExpense(projectId: string, expense: Omit<Depense, 'id'>): Promise<Depense> {
-    const data = storage.getData();
-    const project = data.projects.find(p => p.id === projectId);
-    if (!project) {
-      throw new Error('Projet non trouvé');
+  // Liste toutes les sous-activités d'une activité
+   async listSubActivities(activityId: number): Promise<SubActivity[]> {
+    const token = this.getToken();
+    if (!token) {
+      throw new Error("Token manquant !");
     }
 
-    const newExpense: Depense = {
-      ...expense,
-      id: crypto.randomUUID(),
-      date: new Date(expense.date)
-    };
-
-    project.depenses.push(newExpense);
-    
-    // Mettre à jour le montant dépensé du projet
-    project.budget.montantDepense = project.depenses.reduce((sum, d) => sum + d.montant, 0);
-
-    // Mettre à jour les montants dépensés des activités et sous-activités
-    project.activites.forEach(activity => {
-      activity.sousActivites.forEach(sa => {
-        sa.montantDepense = project.depenses
-          .filter(d => d.sousActiviteId === sa.id)
-          .reduce((sum, d) => sum + d.montant, 0);
-      });
-
-      activity.montantDepense = activity.sousActivites
-        .reduce((sum, sa) => sum + sa.montantDepense, 0);
+    const response = await fetch(`${this.baseUrl}/api/erp/list_subactivities/`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      }
     });
 
-    storage.setData(data);
-    return newExpense;
+    if (!response.ok) {
+      throw new Error("Échec de la récupération des sous-activités");
+    }
+
+    const data = await response.json();
+    
+    // Ensure data is an array before mapping
+    if (!Array.isArray(data)) {
+      console.error("Unexpected API response format:", data);
+      return [];
+    }
+
+    return data.map((subactivity: any) => ({
+      ...subactivity,
+      amount_estimated: parseFloat(subactivity.amount_estimated) || 0,
+      amount_spent: subactivity.amount_spent ? parseFloat(subactivity.amount_spent) : 0,
+      subactivity_gap: subactivity.subactivity_gap ? parseFloat(subactivity.subactivity_gap) : 0,
+    }));
   },
 
-  async updateExpense(projectId: string, expenseId: string, updatedExpense: Depense): Promise<Depense> {
-    const data = storage.getData();
-    const project = data.projects.find(p => p.id === projectId);
-    if (!project) {
-      throw new Error('Projet non trouvé');
-    }
-
-    const expenseIndex = project.depenses.findIndex(e => e.id === expenseId);
-    if (expenseIndex === -1) {
-      throw new Error('Dépense non trouvée');
-    }
-
-    project.depenses[expenseIndex] = {
-      ...updatedExpense,
-      date: new Date(updatedExpense.date)
-    };
-
-    // Mettre à jour le montant dépensé du projet
-    project.budget.montantDepense = project.depenses.reduce((sum, d) => sum + d.montant, 0);
-
-    // Mettre à jour les montants dépensés des activités et sous-activités
-    project.activites.forEach(activity => {
-      activity.sousActivites.forEach(sa => {
-        sa.montantDepense = project.depenses
-          .filter(d => d.sousActiviteId === sa.id)
-          .reduce((sum, d) => sum + d.montant, 0);
-      });
-
-      activity.montantDepense = activity.sousActivites
-        .reduce((sum, sa) => sum + sa.montantDepense, 0);
-    });
+  // Crée une sous-activité
+  async createSubActivity(activityId: number, name: string, amountEstimated: number): Promise<SubActivity> {
+    const token = this.getToken();
     
-    storage.setData(data);
-    return project.depenses[expenseIndex];
+    if (!token) {
+      throw new Error("Token manquant !");
+    }
+
+    const response = await fetch(`${this.baseUrl}/api/erp/create_subactivity/`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        activity: activityId,
+        name: name,
+        amount_estimated: amountEstimated,
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error("Échec de la création de la sous-activité");
+    }
+
+    const newSubActivity = await response.json();
+    return newSubActivity;
   },
 
-  async deleteExpense(projectId: string, expenseId: string): Promise<void> {
-    const data = storage.getData();
-    const project = data.projects.find(p => p.id === projectId);
-    if (!project) {
-      throw new Error('Projet non trouvé');
+  // Récupère les détails d'une sous-activité
+  async getSubActivityDetails(id: number): Promise<SubActivity> {
+    const token = this.getToken();
+    
+    if (!token) {
+      throw new Error("Token manquant !");
     }
 
-    project.depenses = project.depenses.filter(e => e.id !== expenseId);
-
-    // Mettre à jour le montant dépensé du projet
-    project.budget.montantDepense = project.depenses.reduce((sum, d) => sum + d.montant, 0);
-
-    // Mettre à jour les montants dépensés des activités et sous-activités
-    project.activites.forEach(activity => {
-      activity.sousActivites.forEach(sa => {
-        sa.montantDepense = project.depenses
-          .filter(d => d.sousActiviteId === sa.id)
-          .reduce((sum, d) => sum + d.montant, 0);
-      });
-
-      activity.montantDepense = activity.sousActivites
-        .reduce((sum, sa) => sum + sa.montantDepense, 0);
+    const response = await fetch(`${this.baseUrl}/api/erp/subactivity/${id}/`, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      }
     });
 
-    storage.setData(data);
+    if (!response.ok) {
+      throw new Error("Échec de la récupération des détails de la sous-activité");
+    }
+
+    const data = await response.json();
+    return data;
+  },
+
+  // Met à jour une sous-activité
+  async updateSubActivity(id: number, updatedData: Partial<SubActivity>): Promise<SubActivity> {
+    const token = this.getToken();
+    
+    if (!token) {
+      throw new Error("Token manquant !");
+    }
+
+    const response = await fetch(`${this.baseUrl}/api/erp/update_subactivity/${id}/`, {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify(updatedData),
+    });
+
+    if (!response.ok) {
+      throw new Error("Échec de la mise à jour de la sous-activité");
+    }
+
+    const updatedSubActivity = await response.json();
+    return updatedSubActivity;
+  },
+
+  // Supprime une sous-activité
+  async deleteSubActivity(id: number): Promise<void> {
+    const token = this.getToken();
+    
+    if (!token) {
+      throw new Error("Token manquant !");
+    }
+
+    const response = await fetch(`${this.baseUrl}/api/erp/delete_subactivity/${id}/`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error("Échec de la suppression de la sous-activité");
+    }
   }
 };

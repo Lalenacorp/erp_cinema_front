@@ -1,14 +1,14 @@
 import React, { useState } from 'react';
 import { ChevronRight, ChevronDown, Plus, Pencil, Trash2 } from 'lucide-react';
-import type { Activite, SousActivite } from '../types';
+import type { Activity, SubActivity } from '../types';
 import NewSubActivityModal from './NewSubActivityModal';
 import EditSubActivityModal from './EditSubActivityModal';
 import EditActivityModal from './EditActivityModal';
 
 interface ActivityListProps {
-  activities: Activite[];
-  onUpdateActivity?: (activityId: string, updatedActivity: Activite) => void;
-  onDeleteActivity?: (activityId: string) => void;
+  activities: Activity[];
+  onUpdateActivity?: (activityId: number, updatedActivity: Activity) => void;
+  onDeleteActivity?: (activityId: number) => void;
 }
 
 const calculateBudgetVariance = (budget: number, spent: number) => {
@@ -31,8 +31,8 @@ const ActivityList: React.FC<ActivityListProps> = ({
   onDeleteActivity
 }) => {
   const [expandedActivities, setExpandedActivities] = useState<string[]>([]);
-  const [selectedActivity, setSelectedActivity] = useState<Activite | null>(null);
-  const [selectedSubActivity, setSelectedSubActivity] = useState<SousActivite | null>(null);
+  const [selectedActivity, setSelectedActivity] = useState<Activity | null>(null);
+  const [selectedSubActivity, setSelectedSubActivity] = useState<SubActivity | null>(null);
   const [isNewSubActivityModalOpen, setIsNewSubActivityModalOpen] = useState(false);
   const [isEditSubActivityModalOpen, setIsEditSubActivityModalOpen] = useState(false);
   const [isEditActivityModalOpen, setIsEditActivityModalOpen] = useState(false);
@@ -45,7 +45,7 @@ const ActivityList: React.FC<ActivityListProps> = ({
     );
   };
 
-  const handleAddSubActivity = (activityId: string) => {
+  const handleAddSubActivity = (activityId: number) => {
     const activity = activities.find(a => a.id === activityId);
     if (activity) {
       setSelectedActivity(activity);
@@ -53,36 +53,36 @@ const ActivityList: React.FC<ActivityListProps> = ({
     }
   };
 
-  const handleEditActivity = (activity: Activite) => {
+  const handleEditActivity = (activity: Activity) => {
     setSelectedActivity(activity);
     setIsEditActivityModalOpen(true);
   };
 
-  const handleDeleteActivity = (activityId: string) => {
+  const handleDeleteActivity = (activityId: number) => {
     if (onDeleteActivity) {
       onDeleteActivity(activityId);
     }
   };
 
-  const handleEditSubActivity = (activity: Activite, subActivity: SousActivite) => {
+  const handleEditSubActivity = (activity: Activity, subActivity: SubActivity) => {
     setSelectedActivity(activity);
     setSelectedSubActivity(subActivity);
     setIsEditSubActivityModalOpen(true);
   };
 
-  const handleDeleteSubActivity = (activity: Activite, subActivityId: string) => {
+  const handleDeleteSubActivity = (activity: Activity, subActivityId: string) => {
     if (!onUpdateActivity) return;
 
     const updatedActivity = {
       ...activity,
-      sousActivites: activity.sousActivites.filter(sa => sa.id !== subActivityId),
-      montantTotal: activity.montantTotal - activity.sousActivites.find(sa => sa.id === subActivityId)?.montantPrevu!
+      sousActivites: activity.activity_subactivity.filter(sa => sa.id !== subActivityId),
+      montantTotal: activity.total_amount_estimated - activity.sousActivites.find(sa => sa.id === subActivityId)?.montantPrevu!
     };
 
     onUpdateActivity(activity.id, updatedActivity);
   };
 
-  const handleSubActivityUpdate = (activity: Activite, updatedSubActivity: SousActivite) => {
+  const handleSubActivityUpdate = (activity: Activity, updatedSubActivity: SubActivity) => {
     if (!onUpdateActivity) return;
 
     const updatedActivity = {
@@ -99,7 +99,7 @@ const ActivityList: React.FC<ActivityListProps> = ({
     setIsEditSubActivityModalOpen(false);
   };
 
-  const handleNewSubActivity = (activity: Activite, newSubActivity: SousActivite) => {
+  const handleNewSubActivity = (activity: Activity, newSubActivity: SubActivity) => {
     if (!onUpdateActivity) return;
 
     const updatedActivity = {
@@ -112,7 +112,7 @@ const ActivityList: React.FC<ActivityListProps> = ({
     setIsNewSubActivityModalOpen(false);
   };
 
-  const handleActivityUpdate = (updatedActivity: Activite) => {
+  const handleActivityUpdate = (updatedActivity: Activity) => {
     if (!onUpdateActivity) return;
     onUpdateActivity(updatedActivity.id, updatedActivity);
     setIsEditActivityModalOpen(false);
@@ -134,142 +134,134 @@ const ActivityList: React.FC<ActivityListProps> = ({
       </div>
       
       <div className="space-y-4">
-        {activities.map((activity) => {
-          const activitySpent = activity.sousActivites.reduce(
-            (total, sa) => total + (sa.montantDepense || 0),
-            0
-          );
-          const activityVariance = calculateBudgetVariance(activity.montantTotal, activitySpent);
+  {activities?.map((activity) => {
+    const activitySpent = activity.activity_subactivity.reduce(
+      (total, sa) => total + (sa.amount_spent || 0),
+      0
+    );
+    const activityVariance = calculateBudgetVariance(Number(activity.total_amount_estimated) || 0, activitySpent);
 
-          return (
-            <div key={activity.id} className="border rounded-lg overflow-hidden">
-              <div className="flex items-center justify-between p-4 hover:bg-gray-50 transition-colors">
-                <div 
-                  className="flex-1 cursor-pointer"
-                  onClick={() => toggleActivity(activity.nom)}
+
+    return (
+      <div key={activity.id} className="border rounded-lg overflow-hidden">
+        <div className="flex items-center justify-between p-4 hover:bg-gray-50 transition-colors">
+          <div 
+            className="flex-1 cursor-pointer"
+            onClick={() => toggleActivity(activity.name)}
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="font-medium">{activity.name}</h3>
+                <p className="text-sm text-gray-500 mt-1">{activity.description}</p>
+                {activity.created_at && (
+                  <div className="flex items-center gap-2 mt-1 text-sm text-gray-500">
+                    <span>{formatDate(activity.created_at)}</span>
+
+                  </div>
+                )}
+              </div>
+              <div className="flex items-center gap-4">
+                <div className="text-right">
+                  <p className="font-medium">{new Intl.NumberFormat('fr-FR', {
+                    style: 'currency',
+                    currency: 'EUR'
+                  }).format(activity.total_amount_estimated)}</p>
+                  <p className="text-sm text-gray-500">Budget</p>
+                  <p className={`text-sm ${activityVariance.isPositive ? 'text-green-600' : 'text-red-600'}`}>
+                    {activityVariance.isPositive ? '+' : '-'} {activityVariance.formatted}
+                  </p>
+                </div>
+                {expandedActivities.includes(activity.name) ? (
+                  <ChevronDown className="w-5 h-5 text-gray-400" />
+                ) : (
+                  <ChevronRight className="w-5 h-5 text-gray-400" />
+                )}
+              </div>
+            </div>
+          </div>
+          <div className="flex gap-2 ml-4">
+            <button
+              onClick={() => handleEditActivity(activity)}
+              className="p-1 hover:bg-gray-200 rounded-lg transition-colors"
+            >
+              <Pencil className="w-4 h-4 text-blue-600" />
+            </button>
+            <button
+              onClick={() => handleDeleteActivity(activity.id)}
+              className="p-1 hover:bg-gray-200 rounded-lg transition-colors"
+            >
+              <Trash2 className="w-4 h-4 text-red-600" />
+            </button>
+          </div>
+        </div>
+
+        {expandedActivities.includes(activity.name) && (
+          <div className="border-t bg-gray-50">
+            {activity.activity_subactivity.map((sousActivite) => {
+              const subActivityVariance = calculateBudgetVariance(
+                sousActivite.amount_estimated,
+                sousActivite.amount_spent || 0
+              );
+
+              return (
+                <div
+                  key={sousActivite.id}
+                  className="p-4 border-b last:border-b-0 flex items-center justify-between hover:bg-gray-100 transition-colors"
                 >
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <h3 className="font-medium">{activity.nom}</h3>
-                      <p className="text-sm text-gray-500 mt-1">{activity.description}</p>
-                      {activity.createdBy && activity.createdAt && (
-                        <div className="flex items-center gap-2 mt-1 text-sm text-gray-500">
-                          <span>Créé par {activity.createdBy.username}</span>
-                          <span>•</span>
-                          <span>{formatDate(activity.createdAt)}</span>
-                        </div>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-4">
-                      <div className="text-right">
-                        <p className="font-medium">{new Intl.NumberFormat('fr-FR', {
-                          style: 'currency',
-                          currency: 'EUR'
-                        }).format(activity.montantTotal)}</p>
-                        <p className="text-sm text-gray-500">Budget</p>
-                        <p className={`text-sm ${activityVariance.isPositive ? 'text-green-600' : 'text-red-600'}`}>
-                          {activityVariance.isPositive ? '+' : '-'} {activityVariance.formatted}
-                        </p>
-                      </div>
-                      {expandedActivities.includes(activity.nom) ? (
-                        <ChevronDown className="w-5 h-5 text-gray-400" />
-                      ) : (
-                        <ChevronRight className="w-5 h-5 text-gray-400" />
+                  <div>
+                    <h4 className="font-medium text-sm">{sousActivite.name}</h4>
+                    <p className="text-sm text-gray-500">{sousActivite.description}</p>
+                    <div className="flex items-center gap-2 mt-1 text-sm text-gray-500">
+                      {sousActivite.created_at && (
+                        <>
+                          <span>Créé le {formatDate(sousActivite.created_at)}</span>
+                        </>
                       )}
                     </div>
                   </div>
-                </div>
-                <div className="flex gap-2 ml-4">
-                  <button
-                    onClick={() => handleEditActivity(activity)}
-                    className="p-1 hover:bg-gray-200 rounded-lg transition-colors"
-                  >
-                    <Pencil className="w-4 h-4 text-blue-600" />
-                  </button>
-                  <button
-                    onClick={() => handleDeleteActivity(activity.id)}
-                    className="p-1 hover:bg-gray-200 rounded-lg transition-colors"
-                  >
-                    <Trash2 className="w-4 h-4 text-red-600" />
-                  </button>
-                </div>
-              </div>
-
-              {expandedActivities.includes(activity.nom) && (
-                <div className="border-t bg-gray-50">
-                  {activity.sousActivites.map((sousActivite) => {
-                    const subActivityVariance = calculateBudgetVariance(
-                      sousActivite.montantPrevu,
-                      sousActivite.montantDepense || 0
-                    );
-
-                    return (
-                      <div
-                        key={sousActivite.id}
-                        className="p-4 border-b last:border-b-0 flex items-center justify-between hover:bg-gray-100 transition-colors"
+                  <div className="flex items-center gap-4">
+                    <div className="text-right">
+                      <p className="font-medium">{new Intl.NumberFormat('fr-FR', {
+                        style: 'currency',
+                        currency: 'EUR'
+                      }).format(sousActivite.amount_estimated)}</p>
+                      <p className="text-sm text-gray-500">Budget prévu</p>
+                      <p className={`text-sm ${subActivityVariance.isPositive ? 'text-green-600' : 'text-red-600'}`}>
+                        {subActivityVariance.isPositive ? '+' : '-'} {subActivityVariance.formatted}
+                      </p>
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => handleEditSubActivity(activity.id, sousActivite)}
+                        className="p-1 hover:bg-gray-200 rounded-lg transition-colors"
                       >
-                        <div>
-                          <h4 className="font-medium text-sm">{sousActivite.nom}</h4>
-                          <p className="text-sm text-gray-500">{sousActivite.description}</p>
-                          <div className="flex items-center gap-2 mt-1 text-sm text-gray-500">
-                            {sousActivite.intervenant && (
-                              <>
-                                <span>Responsable: {sousActivite.intervenant.nom}</span>
-                                {sousActivite.createdBy && sousActivite.createdAt && (
-                                  <>
-                                    <span>•</span>
-                                    <span>Créé par {sousActivite.createdBy.username}</span>
-                                    <span>•</span>
-                                    <span>{formatDate(sousActivite.createdAt)}</span>
-                                  </>
-                                )}
-                              </>
-                            )}
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-4">
-                          <div className="text-right">
-                            <p className="font-medium">{new Intl.NumberFormat('fr-FR', {
-                              style: 'currency',
-                              currency: 'EUR'
-                            }).format(sousActivite.montantPrevu)}</p>
-                            <p className="text-sm text-gray-500">Budget prévu</p>
-                            <p className={`text-sm ${subActivityVariance.isPositive ? 'text-green-600' : 'text-red-600'}`}>
-                              {subActivityVariance.isPositive ? '+' : '-'} {subActivityVariance.formatted}
-                            </p>
-                          </div>
-                          <div className="flex gap-2">
-                            <button
-                              onClick={() => handleEditSubActivity(activity, sousActivite)}
-                              className="p-1 hover:bg-gray-200 rounded-lg transition-colors"
-                            >
-                              <Pencil className="w-4 h-4 text-blue-600" />
-                            </button>
-                            <button
-                              onClick={() => handleDeleteSubActivity(activity, sousActivite.id)}
-                              className="p-1 hover:bg-gray-200 rounded-lg transition-colors"
-                            >
-                              <Trash2 className="w-4 h-4 text-red-600" />
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                  
-                  <button
-                    onClick={() => handleAddSubActivity(activity.id)}
-                    className="w-full p-3 flex items-center justify-center gap-2 text-blue-600 hover:bg-blue-50 transition-colors"
-                  >
-                    <Plus className="w-4 h-4" />
-                    Ajouter une sous-activité
-                  </button>
+                        <Pencil className="w-4 h-4 text-blue-600" />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteSubActivity(activity.id, sousActivite.id)}
+                        className="p-1 hover:bg-gray-200 rounded-lg transition-colors"
+                      >
+                        <Trash2 className="w-4 h-4 text-red-600" />
+                      </button>
+                    </div>
+                  </div>
                 </div>
-              )}
-            </div>
-          );
-        })}
+              );
+            })}
+            
+            <button
+              onClick={() => handleAddSubActivity(activity.id)}
+              className="w-full p-3 flex items-center justify-center gap-2 text-blue-600 hover:bg-blue-50 transition-colors"
+            >
+              <Plus className="w-4 h-4" />
+              Ajouter une sous-activité
+            </button>
+          </div>
+        )}
       </div>
+    );
+  })}
+</div>
 
       {selectedActivity && (
         <>
