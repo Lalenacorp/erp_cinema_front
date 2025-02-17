@@ -9,163 +9,163 @@ import {
   Pencil,
   Trash2
 } from 'lucide-react';
-import { projectService } from '../services/projectService';
-import type { Project, Activity, SubActivity } from '../types';
+import toast from 'react-hot-toast';
+import { apiService } from '../services/apiService';
+import type { Project, Activity } from '../types';
 import ActivityList from '../components/ActivityList';
 import NewActivityModal from '../components/NewActivityModal';
 import EditProjectModal from '../components/EditProjectModal';
 import DeleteProjectModal from '../components/DeleteProjectModal';
-import NewSubActivityModal from '../components/NewSubActivityModal';
+
+// Helper components for better organization
+const StatCard = ({ 
+  icon: Icon, 
+  title, 
+  value, 
+  bgColor, 
+  iconColor, 
+  children 
+}: {
+  icon: React.ElementType;
+  title: string;
+  value: string | number;
+  bgColor: string;
+  iconColor: string;
+  children?: React.ReactNode;
+}) => (
+  <div className={`${bgColor} rounded-xl p-6`}>
+    <div className="flex items-center justify-between mb-4">
+      <div className={`${iconColor} p-3 rounded-lg`}>
+        <Icon className="w-6 h-6" />
+      </div>
+    </div>
+    <h3 className="text-gray-600 text-sm font-medium">{title}</h3>
+    <p className="text-2xl font-semibold mt-1">{value}</p>
+    {children}
+  </div>
+);
 
 function ProjectDetails() {
   const { id } = useParams<{ id: string }>();
-  const [project, setProject] = useState<Project | null>(null);
-  const [subActivities, setSubActivities] = useState<SubActivity[]>([]);
+  const navigate = useNavigate();
   
+  const [project, setProject] = useState<Project | null>(null);
+  const [activities, setActivities] = useState<Activity[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  
+  // Modal states
   const [isNewActivityModalOpen, setIsNewActivityModalOpen] = useState(false);
   const [isEditProjectModalOpen, setIsEditProjectModalOpen] = useState(false);
   const [isDeleteProjectModalOpen, setIsDeleteProjectModalOpen] = useState(false);
-  const [isNewSubActivityModalOpen, setIsNewSubActivityModalOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
-  const navigate = useNavigate();
-  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (id) {
-      loadProject();
-      loadSubActivities();
+      loadProjectData();
     }
   }, [id]);
 
-  const loadProject = async () => {
+  const loadProjectData = async () => {
     if (!id) return;
+    setIsLoading(true);
+    setError(null);
+
     try {
-      const data = await projectService.getProjectDetails(id);
-      setProject(data);
-    } catch (error) {
-      console.error("Erreur lors du chargement du projet", error);
-      setError("Erreur lors du chargement du projet");
+      // Fetch project details and activities in parallel
+      const [projectData, activitiesData] = await Promise.all([
+        apiService.getProjectDetails(id),
+        apiService.listActivities()
+      ]);
+      
+      // Filter activities to only show those belonging to this project
+      const projectActivities = activitiesData.filter(
+        activity => activity.project === parseInt(id)
+      );
+      
+      setProject(projectData);
+      setActivities(projectActivities);
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : 'Une erreur est survenue';
+      setError(errorMessage);
+      toast.error(errorMessage);
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const loadSubActivities = async () => {
-    if (!id) return;
-  
-    const idNumber = Number(id);
-  
-    if (isNaN(idNumber)) {
-      console.error("L'ID fourni n'est pas un nombre valide");
-      return;
-    }
-  
+  const formatDate = (date: string | undefined | null) => {
+    if (!date) return 'Non définie';
+    
     try {
-      const data = await projectService.listSubActivities(idNumber);
-      setSubActivities(data);
-      setError(null);
+      return new Intl.DateTimeFormat('fr-FR', {
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric'
+      }).format(new Date(date));
     } catch (error) {
-      console.error("Erreur lors du chargement des sous-activités:", error);
-      setError("Erreur lors du chargement des sous-activités");
+      return 'Date invalide';
     }
-  };
-
-  const formatDate = (date: string) => {
-    return new Intl.DateTimeFormat('fr-FR', {
-      day: 'numeric',
-      month: 'long',
-      year: 'numeric'
-    }).format(new Date(date));
-  };
-
-  const formatBudget = (amount: number) => {
-    return new Intl.NumberFormat('fr-FR', {
-      style: 'currency',
-      currency: 'EUR',
-      maximumFractionDigits: 0
-    }).format(amount);
-  };
-
-  const calculateBudgetVariance = (budget: number, spent: number) => {
-    const variance = budget - spent;
-    return {
-      value: variance,
-      isPositive: variance >= 0
-    };
   };
 
   const handleAddActivity = async (newActivity: Activity) => {
     if (!project) return;
+  
     try {
-      await projectService.addActivity(project.id, newActivity);
-      await loadProject();
+      await apiService.createActivity(
+        project.id, 
+        newActivity.name, 
+        newActivity.managed_by
+      );
+      
+      await loadProjectData();
       setIsNewActivityModalOpen(false);
-    } catch (error) {
-      console.error("Erreur lors de l'ajout de l'activité", error);
+      toast.success('Activité ajoutée avec succès');
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : "Erreur lors de l'ajout de l'activité";
+      toast.error(errorMessage);
     }
   };
 
-  const handleUpdateActivity = async (activityId: string, updatedActivity: Activity) => {
+  const handleUpdateActivity = async (activityId: number, updatedActivity: Activity) => {
     if (!project) return;
+    
     try {
-      const updatedProject = {
-        ...project,
-        activites: project.activites.map(activity =>
-          activity.id === activityId ? updatedActivity : activity
-        )
-      };
-      await projectService.updateProject(project.id, updatedProject);
-      await loadProject();
-    } catch (error) {
-      console.error("Erreur lors de la mise à jour de l'activité", error);
+      await apiService.updateActivity(activityId, {
+        name: updatedActivity.name,
+        description: updatedActivity.description || null
+      });
+      await loadProjectData();
+      toast.success('Activité mise à jour avec succès');
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : "Erreur lors de la mise à jour de l'activité";
+      toast.error(errorMessage);
     }
   };
 
-  const handleDeleteActivity = async (activityId: string) => {
+  const handleDeleteActivity = async (activityId: number) => {
     if (!project) return;
+    
     try {
-      const updatedProject = {
-        ...project,
-        activites: project.activites.filter(activity => activity.id !== activityId)
-      };
-      await projectService.updateProject(project.id, updatedProject);
-      await loadProject();
-    } catch (error) {
-      console.error("Erreur lors de la suppression de l'activité", error);
+      await apiService.deleteActivity(activityId);
+      await loadProjectData();
+      toast.success('Activité supprimée avec succès');
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : "Erreur lors de la suppression de l'activité";
+      toast.error(errorMessage);
     }
   };
 
-  const handleAddSubActivity = async (newSubActivity: SubActivity) => {
-    if (!project) return;
+  const handleProjectUpdate = async (updatedProject: Project) => {
     try {
-      await projectService.addSubActivity(project.id, newSubActivity);
-      await loadSubActivities();
-      setIsNewSubActivityModalOpen(false);
-    } catch (error) {
-      console.error("Erreur lors de l'ajout de la sous-activité", error);
+      await apiService.updateProject(project!.id, updatedProject);
+      await loadProjectData();
+      setIsEditProjectModalOpen(false);
+      toast.success('Projet mis à jour avec succès');
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : "Erreur lors de la mise à jour du projet";
+      toast.error(errorMessage);
     }
-  };
-
-  const handleUpdateSubActivity = async (subActivityId: string, updatedSubActivity: SubActivity) => {
-    if (!project) return;
-    try {
-      await projectService.updateSubActivity(subActivityId, updatedSubActivity);
-      await loadSubActivities();
-    } catch (error) {
-      console.error("Erreur lors de la mise à jour de la sous-activité", error);
-    }
-  };
-
-  const handleDeleteSubActivity = async (subActivityId: string) => {
-    if (!project) return;
-    try {
-      await projectService.deleteSubActivity(subActivityId);
-      await loadSubActivities();
-    } catch (error) {
-      console.error("Erreur lors de la suppression de la sous-activité", error);
-    }
-  };
-
-  const handleProjectUpdate = (updatedProject: Project) => {
-    setProject(updatedProject);
   };
 
   const handleDeleteProject = async () => {
@@ -173,29 +173,45 @@ function ProjectDetails() {
     
     setIsDeleting(true);
     try {
-      await projectService.deleteProject(project.id);
+      await apiService.deleteProject(project.id);
       setIsDeleteProjectModalOpen(false);
-      navigate('//projets'); // Redirection vers la liste des projets
-    } catch (error) {
-      console.error("Erreur lors de la suppression du projet:", error);
-      setError("Une erreur est survenue lors de la suppression du projet");
+      toast.success('Projet supprimé avec succès');
+      navigate('/projets');
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : "Erreur lors de la suppression du projet";
+      toast.error(errorMessage);
     } finally {
       setIsDeleting(false);
     }
   };
 
-  if (!project) {
-    return <div>Chargement...</div>;
+  if (isLoading) {
+    return (
+      <div className="flex justify-center items-center h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    );
   }
 
-  const budgetVariance = calculateBudgetVariance(
-    project.budget.montantTotal || 0,
-    project.budget.montantDepense || 0
-  );
+  if (error || !project) {
+    return (
+      <div className="flex flex-col items-center justify-center h-screen">
+        <h2 className="text-xl font-semibold text-red-600 mb-4">
+          {error || 'Projet non trouvé'}
+        </h2>
+        <button
+          onClick={() => navigate('/projets')}
+          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+        >
+          Retour aux projets
+        </button>
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-8">
-      {/* En-tête du projet */}
+    <div className="space-y-8 p-6">
+      {/* Project Header */}
       <div className="bg-white rounded-xl shadow-sm">
         <div className="p-6 border-b">
           <div className="flex justify-between items-start mb-4">
@@ -222,87 +238,55 @@ function ProjectDetails() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mt-6">
-            {/* Budget */}
-            <div className="bg-blue-50 rounded-xl p-6">
-              <div className="flex items-center justify-between mb-4">
-                <div className="bg-blue-100 p-3 rounded-lg">
-                  <DollarSign className="w-6 h-6 text-blue-600" />
-                </div>
-              </div>
-              <h3 className="text-gray-600 text-sm font-medium">Budget total</h3>
-              <p className="text-2xl font-semibold mt-1">{formatBudget(project.budget.montantTotal || 0)}</p>
+            <StatCard
+              icon={DollarSign}
+              title="Budget total"
+              value={project.budget}
+              bgColor="bg-blue-50"
+              iconColor="bg-blue-100 text-blue-600"
+            >
               <div className="mt-2 space-y-2">
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-600">Dépensé :</span>
-                  <span className="font-medium">{formatBudget(project.budget.montantDepense || 0)}</span>
+                  <span className="font-medium">{project.current_expenses || '0'}</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-600">Écart :</span>
-                  <span className={`font-medium ${budgetVariance.isPositive ? 'text-green-600' : 'text-red-600'}`}>
-                    {formatBudget(budgetVariance.value)}
+                  <span className={`font-medium ${Number(project.budget_gap) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    {project.budget_gap || '0'}
                   </span>
                 </div>
-                <div className="pt-2 border-t">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-600">Progression :</span>
-                    <span className={`font-medium ${project.budget.montantDepense > project.budget.montantTotal ? 'text-red-600' : 'text-blue-600'}`}>
-                      {((project.budget.montantDepense || 0) / (project.budget.montantTotal || 1) * 100).toFixed(1)}%
-                    </span>
-                  </div>
-                  <div className="mt-2 h-2 bg-gray-200 rounded-full overflow-hidden">
-                    <div 
-                      className={`h-full rounded-full transition-all duration-500 ${project.budget.montantDepense > project.budget.montantTotal ? 'bg-red-500' : 'bg-blue-500'}`}
-                      style={{ 
-                        width: `${Math.min(
-                          ((project.budget.montantDepense || 0) / (project.budget.montantTotal || 1)) * 100,
-                          100
-                        )}%` 
-                      }}
-                    />
-                  </div>
-                </div>
               </div>
-            </div>
+            </StatCard>
 
-            {/* Durée */}
-            <div className="bg-green-50 rounded-xl p-6">
-              <div className="flex items-center justify-between mb-4">
-                <div className="bg-green-100 p-3 rounded-lg">
-                  <Calendar className="w-6 h-6 text-green-600" />
-                </div>
-              </div>
-              <h3 className="text-gray-600 text-sm font-medium">Durée</h3>
-              <p className="text-xl font-semibold mt-1">
-                {formatDate(project.created_at)} - {formatDate(project.updated_at)}
-              </p>
-            </div>
+            <StatCard
+              icon={Calendar}
+              title="Date de début"
+              value={formatDate(project.dateDebut)}
+              bgColor="bg-green-50"
+              iconColor="bg-green-100 text-green-600"
+            />
 
-            {/* Responsable */}
-            <div className="bg-yellow-50 rounded-xl p-6">
-              <div className="flex items-center justify-between mb-4">
-                <div className="bg-yellow-100 p-3 rounded-lg">
-                  <Users className="w-6 h-6 text-yellow-600" />
-                </div>
-              </div>
-              <h3 className="text-gray-600 text-sm font-medium">Responsable</h3>
-              <p className="text-xl font-semibold mt-1">{project.managed_by || 'Aucun responsable assigné'}</p>
-            </div>
+            <StatCard
+              icon={Users}
+              title="Responsable"
+              value={project.managed_by || 'Non assigné'}
+              bgColor="bg-yellow-50"
+              iconColor="bg-yellow-100 text-yellow-600"
+            />
 
-            {/* Statut */}
-            <div className="bg-red-50 rounded-xl p-6">
-              <div className="flex items-center justify-between mb-4">
-                <div className="bg-red-100 p-3 rounded-lg">
-                  <Clock className="w-6 h-6 text-red-600" />
-                </div>
-              </div>
-              <h3 className="text-gray-600 text-sm font-medium">Statut</h3>
-              <p className="text-xl font-semibold mt-1">{project.status}</p>
-            </div>
+            <StatCard
+              icon={Clock}
+              title="Statut"
+              value={project.status || 'Non défini'}
+              bgColor="bg-red-50"
+              iconColor="bg-red-100 text-red-600"
+            />
           </div>
         </div>
       </div>
 
-      {/* Activités */}
+      {/* Activities Section */}
       <div className="bg-white rounded-xl shadow-sm">
         <div className="p-6">
           <div className="flex justify-between items-center mb-6">
@@ -317,31 +301,9 @@ function ProjectDetails() {
           </div>
 
           <ActivityList
-            activities={project.activites}
-            onDelete={handleDeleteActivity}
-            onUpdate={handleUpdateActivity}
-          />
-        </div>
-      </div>
-
-      {/* Sous-activités */}
-      <div className="bg-white rounded-xl shadow-sm">
-        <div className="p-6">
-          <div className="flex justify-between items-center mb-6">
-            <h2 className="text-xl font-semibold">Sous-activités</h2>
-            <button
-              onClick={() => setIsNewSubActivityModalOpen(true)}
-              className="text-blue-600 hover:bg-blue-50 p-2 rounded-lg flex items-center gap-2 transition-colors"
-            >
-              <Plus className="w-4 h-4" />
-              Ajouter une sous-activité
-            </button>
-          </div>
-
-          <ActivityList
-            activities={project.subActivities}
-            onDelete={handleDeleteSubActivity}
-            onUpdate={handleUpdateSubActivity}
+            activities={activities}
+            onUpdateActivity={handleUpdateActivity}
+            onDeleteActivity={handleDeleteActivity}
           />
         </div>
       </div>
@@ -350,7 +312,9 @@ function ProjectDetails() {
       <NewActivityModal
         isOpen={isNewActivityModalOpen}
         onClose={() => setIsNewActivityModalOpen(false)}
-        onSave={handleAddActivity}
+        onSubmit={handleAddActivity}
+        projects={[project]}
+        selectedProjectId={project.id.toString()}
       />
 
       <EditProjectModal
@@ -360,20 +324,12 @@ function ProjectDetails() {
         onSubmit={handleProjectUpdate}
       />
 
-     
-
-<DeleteProjectModal
-    isOpen={isDeleteProjectModalOpen}
-    onClose={() => setIsDeleteProjectModalOpen(false)}
-    onConfirm={handleDeleteProject}
-    projectName={project?.name || ''}
-    isLoading={isDeleting}
-  />
-
-      <NewSubActivityModal
-        isOpen={isNewSubActivityModalOpen}
-        onClose={() => setIsNewSubActivityModalOpen(false)}
-        onSave={handleAddSubActivity}
+      <DeleteProjectModal
+        isOpen={isDeleteProjectModalOpen}
+        onClose={() => setIsDeleteProjectModalOpen(false)}
+        onConfirm={handleDeleteProject}
+        projectName={project.name}
+        isLoading={isDeleting}
       />
     </div>
   );

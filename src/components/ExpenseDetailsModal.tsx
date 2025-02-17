@@ -1,12 +1,13 @@
 import React from 'react';
-import { X, FileText, Calendar, DollarSign, Link2, Pencil, Trash2 } from 'lucide-react';
-import type { Depense, Project, Activite, SousActivite } from '../types';
+import { X, Pencil, Trash2 } from 'lucide-react';
+import type { Expense } from '../types/expense';
+import type { SubActivity } from '../types/activity';
 
 interface ExpenseDetailsModalProps {
   isOpen: boolean;
   onClose: () => void;
-  expense: Depense;
-  project?: Project;
+  expense: Expense;
+  subActivity: SubActivity;
   onEdit: () => void;
   onDelete: () => void;
 }
@@ -15,13 +16,13 @@ const ExpenseDetailsModal: React.FC<ExpenseDetailsModalProps> = ({
   isOpen,
   onClose,
   expense,
-  project,
+  subActivity,
   onEdit,
   onDelete
 }) => {
   if (!isOpen) return null;
 
-  const formatDate = (date: Date) => {
+  const formatDate = (date: string) => {
     return new Intl.DateTimeFormat('fr-FR', {
       day: 'numeric',
       month: 'long',
@@ -29,140 +30,71 @@ const ExpenseDetailsModal: React.FC<ExpenseDetailsModalProps> = ({
     }).format(new Date(date));
   };
 
-  const formatAmount = (amount: number) => {
+  const formatAmount = (amount: string) => {
     return new Intl.NumberFormat('fr-FR', {
       style: 'currency',
       currency: 'EUR'
-    }).format(amount);
+    }).format(parseFloat(amount));
   };
-
-  const handleViewJustificatif = () => {
-    if (expense.justificatif?.startsWith('data:')) {
-      const byteString = atob(expense.justificatif.split(',')[1]);
-      const mimeString = expense.justificatif.split(',')[0].split(':')[1].split(';')[0];
-      const ab = new ArrayBuffer(byteString.length);
-      const ia = new Uint8Array(ab);
-      for (let i = 0; i < byteString.length; i++) {
-        ia[i] = byteString.charCodeAt(i);
-      }
-      const blob = new Blob([ab], { type: mimeString });
-      const url = URL.createObjectURL(blob);
-      window.open(url, '_blank');
-    }
-  };
-
-  // Trouver l'activité et la sous-activité associées
-  let foundActivity: Activite | undefined;
-  let foundSubActivity: SousActivite | undefined;
-
-  if (project) {
-    for (const activity of project.activites) {
-      const subActivity = activity.sousActivites.find(sa => sa.id === expense.sousActiviteId);
-      if (subActivity) {
-        foundActivity = activity;
-        foundSubActivity = subActivity;
-        break;
-      }
-    }
-  }
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
       <div className="bg-white rounded-xl w-full max-w-2xl p-6">
-        <div className="flex justify-between items-center mb-6">
-          <div className="flex items-center gap-3">
-            <div className="bg-blue-100 p-2 rounded-lg">
-              <FileText className="w-6 h-6 text-blue-600" />
-            </div>
+        <div className="flex justify-between items-start mb-6">
+          <div>
             <h2 className="text-2xl font-bold">Détails de la dépense</h2>
+            <p className="text-gray-600 mt-1">
+              Sous-activité : {subActivity.name}
+            </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-4">
             <button
               onClick={onEdit}
-              className="p-2 hover:bg-blue-50 rounded-lg text-blue-600 transition-colors"
-              title="Modifier"
+              className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+              title="Modifier la dépense"
             >
               <Pencil className="w-5 h-5" />
             </button>
             <button
               onClick={onDelete}
-              className="p-2 hover:bg-red-50 rounded-lg text-red-600 transition-colors"
-              title="Supprimer"
+              className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+              title="Supprimer la dépense"
             >
               <Trash2 className="w-5 h-5" />
             </button>
-            <button 
-              onClick={onClose} 
-              className="p-2 hover:bg-gray-100 rounded-lg text-gray-500 transition-colors"
+            <button
+              onClick={onClose}
+              className="text-gray-500 hover:text-gray-700 transition-colors"
             >
-              <X className="w-5 h-5" />
+              <X className="w-6 h-6" />
             </button>
           </div>
         </div>
 
         <div className="space-y-6">
-          {/* Description */}
-          <div>
-            <h3 className="text-lg font-semibold mb-2">Description</h3>
-            <p className="text-gray-700">{expense.description}</p>
-          </div>
-
-          {/* Informations principales */}
           <div className="grid grid-cols-2 gap-6">
             <div>
-              <div className="flex items-center gap-2 text-gray-600 mb-1">
-                <DollarSign className="w-4 h-4" />
-                <span className="text-sm">Montant</span>
-              </div>
-              <p className="text-xl font-semibold text-blue-600">
-                {formatAmount(expense.montant)}
+              <h3 className="text-sm font-medium text-gray-500">Montant</h3>
+              <p className="mt-1 text-lg font-semibold">
+                {formatAmount(expense.amount)}
               </p>
             </div>
             <div>
-              <div className="flex items-center gap-2 text-gray-600 mb-1">
-                <Calendar className="w-4 h-4" />
-                <span className="text-sm">Date</span>
-              </div>
-              <p className="text-lg">{formatDate(expense.date)}</p>
+              <h3 className="text-sm font-medium text-gray-500">Créé par</h3>
+              <p className="mt-1">Utilisateur #{expense.created_by}</p>
             </div>
           </div>
 
-          {/* Activité et sous-activité associées */}
-          {foundActivity && foundSubActivity && (
-            <div>
-              <div className="flex items-center gap-2 text-gray-600 mb-2">
-                <Link2 className="w-4 h-4" />
-                <span className="text-sm">Activité et sous-activité associées</span>
+          <div className="border-t pt-4">
+            <div className="grid grid-cols-2 gap-6 text-sm text-gray-500">
+              <div>
+                <p>Créée le {formatDate(expense.created_at)}</p>
               </div>
-              <div className="bg-gray-50 p-4 rounded-lg space-y-3">
-                <div>
-                  <h4 className="font-medium">Activité</h4>
-                  <p className="text-sm text-gray-600">{foundActivity.nom}</p>
-                </div>
-                <div>
-                  <h4 className="font-medium">Sous-activité</h4>
-                  <p className="text-sm text-gray-600">{foundSubActivity.nom}</p>
-                  <p className="text-sm text-gray-500 mt-1">
-                    Responsable : {foundSubActivity.intervenant.nom}
-                  </p>
-                </div>
+              <div>
+                <p>Dernière modification le {formatDate(expense.updated_at)}</p>
               </div>
             </div>
-          )}
-
-          {/* Justificatif */}
-          {expense.justificatif && (
-            <div>
-              <h3 className="text-lg font-semibold mb-2">Justificatif</h3>
-              <button
-                onClick={handleViewJustificatif}
-                className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-gray-50 hover:bg-gray-100 rounded-lg text-blue-600 font-medium transition-colors"
-              >
-                <FileText className="w-5 h-5" />
-                Voir le justificatif
-              </button>
-            </div>
-          )}
+          </div>
         </div>
       </div>
     </div>

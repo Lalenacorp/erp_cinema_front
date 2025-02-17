@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Pencil, Trash2, Save, XCircle, User as UserIcon, Mail, UserCheck, Users } from 'lucide-react';
 import { authService } from '../services/authService';
-import { User, Group } from '../types';
+import { User, Group } from '../types/auth';
 
 interface UserDetailsProps {
   isOpen: boolean;

@@ -1,13 +1,14 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
-import type { Activite, SousActivite } from '../types';
+import type { Activity, SubActivity } from '../types';
+import toast from 'react-hot-toast';
 
 interface EditSubActivityModalProps {
   isOpen: boolean;
   onClose: () => void;
-  activity: Activite;
-  subActivity: SousActivite;
-  onSubmit: (updatedSubActivity: SousActivite) => void;
+  activity: Activity;
+  subActivity: SubActivity | null;
+  onSubmit: (updatedSubActivity: SubActivity) => void;
 }
 
 const EditSubActivityModal: React.FC<EditSubActivityModalProps> = ({
@@ -17,24 +18,73 @@ const EditSubActivityModal: React.FC<EditSubActivityModalProps> = ({
   subActivity,
   onSubmit
 }) => {
-  const [editedSubActivity, setEditedSubActivity] = useState<SousActivite>({...subActivity});
+  const [formData, setFormData] = useState<{
+    name: string;
+    description: string | null;
+  }>({
+    name: '',
+    description: null
+  });
+
+  useEffect(() => {
+    if (subActivity) {
+      setFormData({
+        name: subActivity.name || '',
+        description: subActivity.description
+      });
+    }
+  }, [subActivity]);
+
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
+  const validateForm = (): boolean => {
+    const newErrors: Record<string, string> = {};
+
+    if (!formData.name?.trim()) {
+      newErrors.name = 'Le nom est requis';
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onSubmit(editedSubActivity);
+
+    if (!subActivity || !validateForm()) {
+      toast.error('Veuillez corriger les erreurs avant de continuer');
+      return;
+    }
+
+    try {
+      // Create the update payload with only the fields that should be updated
+      const updatedSubActivity: SubActivity = {
+        ...subActivity,
+        name: formData.name,
+        description: formData.description
+      };
+
+      onSubmit(updatedSubActivity);
+    } catch (error) {
+      console.error('Error updating sub-activity:', error);
+      toast.error("Erreur lors de la mise à jour de la sous-activité");
+    }
   };
 
-  if (!isOpen) return null;
+  if (!isOpen || !subActivity) return null;
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-xl w-full max-w-2xl p-6">
+      <div className="bg-white rounded-xl w-full max-w-lg p-6">
         <div className="flex justify-between items-center mb-6">
           <div>
             <h2 className="text-2xl font-bold">Modifier la sous-activité</h2>
-            <p className="text-gray-600 mt-1">Pour l'activité : {activity.nom}</p>
+            <p className="text-gray-600 mt-1">Pour l'activité : {activity.name}</p>
           </div>
-          <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
+          <button
+            onClick={onClose}
+            className="text-gray-500 hover:text-gray-700 transition-colors"
+          >
             <X className="w-6 h-6" />
           </button>
         </div>
@@ -42,15 +92,23 @@ const EditSubActivityModal: React.FC<EditSubActivityModalProps> = ({
         <form onSubmit={handleSubmit} className="space-y-6">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Nom de la sous-activité
+              Nom <span className="text-red-500">*</span>
             </label>
             <input
               type="text"
-              value={editedSubActivity.nom}
-              onChange={(e) => setEditedSubActivity({ ...editedSubActivity, nom: e.target.value })}
-              className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
-              required
+              value={formData.name}
+              onChange={(e) => {
+                setFormData({ ...formData, name: e.target.value });
+                setErrors({ ...errors, name: '' });
+              }}
+              className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${
+                errors.name ? 'border-red-500' : 'border-gray-300'
+              }`}
+              placeholder="Nom de la sous-activité"
             />
+            {errors.name && (
+              <p className="mt-1 text-sm text-red-500">{errors.name}</p>
+            )}
           </div>
 
           <div>
@@ -58,93 +116,27 @@ const EditSubActivityModal: React.FC<EditSubActivityModalProps> = ({
               Description
             </label>
             <textarea
-              value={editedSubActivity.description}
-              onChange={(e) => setEditedSubActivity({ ...editedSubActivity, description: e.target.value })}
-              className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
+              value={formData.description || ''}
+              onChange={(e) => setFormData({ ...formData, description: e.target.value || null })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
               rows={3}
+              placeholder="Description de la sous-activité"
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Montant prévu (€)
-              </label>
-              <input
-                type="number"
-                value={editedSubActivity.montantPrevu}
-                onChange={(e) => setEditedSubActivity({
-                  ...editedSubActivity,
-                  montantPrevu: parseFloat(e.target.value)
-                })}
-                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
-                required
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Statut
-              </label>
-              <select
-                value={editedSubActivity.statut}
-                onChange={(e) => setEditedSubActivity({
-                  ...editedSubActivity,
-                  statut: e.target.value as 'En cours' | 'Terminée' | 'En attente'
-                })}
-                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
-                required
-              >
-                <option value="En attente">En attente</option>
-                <option value="En cours">En cours</option>
-                <option value="Terminée">Terminée</option>
-              </select>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Date de début
-              </label>
-              <input
-                type="date"
-                value={editedSubActivity.dateDebut?.toISOString().split('T')[0]}
-                onChange={(e) => setEditedSubActivity({
-                  ...editedSubActivity,
-                  dateDebut: new Date(e.target.value)
-                })}
-                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Date de fin prévue
-              </label>
-              <input
-                type="date"
-                value={editedSubActivity.dateFin?.toISOString().split('T')[0]}
-                onChange={(e) => setEditedSubActivity({
-                  ...editedSubActivity,
-                  dateFin: new Date(e.target.value)
-                })}
-                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-          </div>
-
-          <div className="flex justify-end gap-3 pt-4">
+          <div className="flex justify-end gap-3">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg"
+              className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
             >
               Annuler
             </button>
             <button
               type="submit"
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
             >
-              Enregistrer les modifications
+              Mettre à jour
             </button>
           </div>
         </form>

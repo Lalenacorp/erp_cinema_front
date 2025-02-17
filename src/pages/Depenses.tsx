@@ -1,19 +1,19 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, FileText, Eye } from 'lucide-react';
+import { Plus, Search, Filter } from 'lucide-react';
 import { projectService } from '../services/projectService';
-import type { Project, Depense } from '../types';
+import { expenseService } from '../services/expenseService';
+import type { Project } from '../types';
+import type { Expense, ExpenseUpdateResponse } from '../types/expense';
+import { ExpenseList } from '../components/ExpenseList';
 import NewExpenseModal from '../components/NewExpenseModal';
-import EditExpenseModal from '../components/EditExpenseModal';
-import ExpenseDetailsModal from '../components/ExpenseDetailsModal';
+import toast from 'react-hot-toast';
 
 function Depenses() {
   const [projects, setProjects] = useState<Project[]>([]);
-  const [selectedProjectId, setSelectedProjectId] = useState<string>('');
-  const [expenses, setExpenses] = useState<Depense[]>([]);
+  const [selectedProject, setSelectedProject] = useState<string>('');
   const [isNewExpenseModalOpen, setIsNewExpenseModalOpen] = useState(false);
-  const [isEditExpenseModalOpen, setIsEditExpenseModalOpen] = useState(false);
-  const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
-  const [selectedExpense, setSelectedExpense] = useState<Depense | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     loadProjects();
@@ -21,205 +21,112 @@ function Depenses() {
 
   const loadProjects = async () => {
     try {
+      setIsLoading(true);
       const data = await projectService.getProjects();
       setProjects(data);
-      
-      // Extraire toutes les dépenses des projets
-      const allExpenses = data.flatMap(project => project.depenses);
-      setExpenses(allExpenses);
-    } catch (error) {
-      console.error('Erreur lors du chargement des projets:', error);
+      setError(null);
+    } catch (err: any) {
+      setError(err.message || 'Erreur lors du chargement des projets');
+      toast.error('Erreur lors du chargement des projets');
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const handleAddExpense = async (newExpense: Omit<Depense, 'id'>) => {
+  const handleExpenseUpdate = (data: ExpenseUpdateResponse) => {
+    // Mettre à jour l'interface utilisateur avec les nouvelles données
+    console.log('Mise à jour des dépenses:', data);
+    loadProjects(); // Recharger les projets pour avoir les montants à jour
+  };
+
+  const handleAddExpense = async (expense: Expense) => {
     try {
-      if (!selectedProjectId && !projects[0]?.id) return;
-      const projectId = selectedProjectId || projects[0].id;
-      
-      await projectService.addExpense(projectId, newExpense);
-      await loadProjects();
+      // La logique d'ajout est maintenant gérée via WebSocket dans le modal
+      toast.success('Dépense ajoutée avec succès');
       setIsNewExpenseModalOpen(false);
     } catch (error) {
-      console.error('Erreur lors de l\'ajout de la dépense:', error);
+      toast.error("Erreur lors de l'ajout de la dépense");
     }
   };
 
-  const handleEditExpense = async (expenseId: string, updatedExpense: Depense) => {
-    try {
-      const project = projects.find(p => p.depenses.some(d => d.id === expenseId));
-      if (!project) return;
+  if (isLoading) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-100 border-t-blue-600"></div>
+      </div>
+    );
+  }
 
-      await projectService.updateExpense(project.id, expenseId, updatedExpense);
-      await loadProjects();
-      setIsEditExpenseModalOpen(false);
-      setSelectedExpense(null);
-    } catch (error) {
-      console.error('Erreur lors de la mise à jour de la dépense:', error);
-    }
-  };
-
-  const handleDeleteExpense = async (expenseId: string) => {
-    try {
-      const project = projects.find(p => p.depenses.some(d => d.id === expenseId));
-      if (!project) return;
-
-      await projectService.deleteExpense(project.id, expenseId);
-      await loadProjects();
-      setSelectedExpense(null);
-    } catch (error) {
-      console.error('Erreur lors de la suppression de la dépense:', error);
-    }
-  };
-
-  const handleViewExpense = (expense: Depense) => {
-    setSelectedExpense(expense);
-    setIsDetailsModalOpen(true);
-  };
-
-  const formatDate = (date: Date) => {
-    return new Intl.DateTimeFormat('fr-FR', {
-      day: 'numeric',
-      month: 'long',
-      year: 'numeric'
-    }).format(new Date(date));
-  };
-
-  const formatAmount = (amount: number) => {
-    return new Intl.NumberFormat('fr-FR', {
-      style: 'currency',
-      currency: 'EUR'
-    }).format(amount);
-  };
-
-  const filteredExpenses = selectedProjectId
-    ? expenses.filter(expense => {
-        const project = projects.find(p => p.id === selectedProjectId);
-        return project?.depenses.some(d => d.id === expense.id);
-      })
-    : expenses;
-
-  const selectedExpenseProject = selectedExpense
-    ? projects.find(p => p.depenses.some(d => d.id === selectedExpense.id))
-    : undefined;
+  if (error) {
+    return (
+      <div className="bg-red-50 text-red-600 p-4 rounded-lg">
+        {error}
+      </div>
+    );
+  }
 
   return (
-    <>
-      <div className="mb-8">
-        <div className="flex justify-between items-center mb-6">
-          <div>
-            <h1 className="text-2xl font-bold mb-2">Dépenses</h1>
-            <p className="text-gray-600">Gérez les dépenses de vos projets</p>
-          </div>
-          <button
-            onClick={() => setIsNewExpenseModalOpen(true)}
-            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2"
-          >
-            <Plus className="w-5 h-5" />
-            Nouvelle Dépense
-          </button>
+    <div className="space-y-8">
+      <div className="flex justify-between items-center">
+        <div>
+          <h1 className="text-2xl font-bold mb-2">Dépenses</h1>
+          <p className="text-gray-600">Gérez les dépenses de vos projets</p>
         </div>
-
-        {/* Filtre par projet */}
-        <div className="mb-6">
-          <select
-            value={selectedProjectId}
-            onChange={(e) => setSelectedProjectId(e.target.value)}
-            className="w-full md:w-64 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
-          >
-            <option value="">Tous les projets</option>
-            {projects.map((project) => (
-              <option key={project.id} value={project.id}>
-                {project.nom}
-              </option>
-            ))}
-          </select>
-        </div>
+        <button
+          onClick={() => setIsNewExpenseModalOpen(true)}
+          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors"
+          disabled={!selectedProject}
+        >
+          <Plus className="w-5 h-5" />
+          Nouvelle dépense
+        </button>
       </div>
 
-      {/* Liste des dépenses */}
       <div className="bg-white rounded-xl shadow-sm">
         <div className="p-6 border-b">
-          <h2 className="text-xl font-semibold">Liste des dépenses</h2>
-          <p className="text-gray-600 mt-1">Toutes les dépenses enregistrées</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <select
+              value={selectedProject}
+              onChange={(e) => setSelectedProject(e.target.value)}
+              className="px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">Sélectionnez un projet</option>
+              {projects.map((project) => (
+                <option key={project.id} value={project.id}>
+                  {project.name}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
 
-        <div className="divide-y">
-          {filteredExpenses.map((expense) => (
-            <div key={expense.id} className="p-6 hover:bg-gray-50 transition-colors">
-              <div className="flex justify-between items-start mb-2">
-                <div className="flex items-start gap-4">
-                  <div className="bg-blue-100 p-2 rounded-lg">
-                    <FileText className="w-6 h-6 text-blue-600" />
-                  </div>
-                  <div>
-                    <h3 className="font-medium">{expense.description}</h3>
-                    <p className="text-sm text-gray-500">{formatDate(expense.date)}</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-4">
-                  <p className="font-semibold">{formatAmount(expense.montant)}</p>
-                  <button
-                    onClick={() => handleViewExpense(expense)}
-                    className="text-blue-600 hover:bg-blue-50 px-4 py-2 rounded-lg flex items-center gap-2"
-                  >
-                    <Eye className="w-4 h-4" />
-                    Voir les détails
-                  </button>
-                </div>
-              </div>
-            </div>
-          ))}
-
-          {filteredExpenses.length === 0 && (
-            <div className="p-6 text-center text-gray-500">
-              Aucune dépense trouvée
+        <div className="p-6">
+          {selectedProject ? (
+            <ExpenseList
+              projectId={selectedProject}
+              onExpenseUpdate={handleExpenseUpdate}
+            />
+          ) : (
+            <div className="text-center py-12">
+              <Filter className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+              <h3 className="text-lg font-medium text-gray-900 mb-2">
+                Sélectionnez un projet
+              </h3>
+              <p className="text-gray-600">
+                Choisissez un projet pour voir et gérer ses dépenses
+              </p>
             </div>
           )}
         </div>
       </div>
 
-      {/* Modales */}
       <NewExpenseModal
         isOpen={isNewExpenseModalOpen}
         onClose={() => setIsNewExpenseModalOpen(false)}
         onSubmit={handleAddExpense}
         projects={projects}
-        selectedProjectId={selectedProjectId}
       />
-
-      {selectedExpense && (
-        <>
-          <EditExpenseModal
-            isOpen={isEditExpenseModalOpen}
-            onClose={() => {
-              setIsEditExpenseModalOpen(false);
-              setSelectedExpense(null);
-            }}
-            expense={selectedExpense}
-            onSubmit={handleEditExpense}
-          />
-
-          <ExpenseDetailsModal
-            isOpen={isDetailsModalOpen}
-            onClose={() => {
-              setIsDetailsModalOpen(false);
-              setSelectedExpense(null);
-            }}
-            expense={selectedExpense}
-            project={selectedExpenseProject}
-            onEdit={() => {
-              setIsDetailsModalOpen(false);
-              setIsEditExpenseModalOpen(true);
-            }}
-            onDelete={() => {
-              setIsDetailsModalOpen(false);
-              handleDeleteExpense(selectedExpense.id);
-            }}
-          />
-        </>
-      )}
-    </>
+    </div>
   );
 }
 

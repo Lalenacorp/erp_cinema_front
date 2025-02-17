@@ -1,13 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { Film, Key, Eye, EyeOff } from 'lucide-react';
 import { authService } from '../services/authService';
+import toast from 'react-hot-toast';
 
 function ResetPassword() {
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
-  const uid = searchParams.get('uid'); // Récupère l'uid de l'URL
-  const token = searchParams.get('token'); // Récupère le token de l'URL
+  const { uid, token } = useParams();
 
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -15,16 +14,22 @@ function ResetPassword() {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-/*   useEffect(() => {
-    // Si l'uid ou le token est manquant, redirige vers la page de login
-    if (!uid || !token) {
-      navigate('/login');
+  useEffect(() => {
+    // Si l'uid et le token sont présents, on les valide
+    if (uid && token) {
+      // Ici on pourrait ajouter une validation préliminaire du token si nécessaire
+      console.log('Reset password with:', { uid, token });
     }
-  }, [uid, token, navigate]); */
+  }, [uid, token]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
+
+    if (!uid || !token) {
+      setError('Lien de réinitialisation invalide');
+      return;
+    }
 
     // Vérification des mots de passe
     if (password !== confirmPassword) {
@@ -39,11 +44,24 @@ function ResetPassword() {
 
     setIsLoading(true);
     try {
-      // Envoi de la requête au backend
-      await authService.resetPassword(uid!, token!, password);
-      navigate('/login', { state: { message: 'Votre mot de passe a été réinitialisé avec succès' } });
+      const response = await authService.resetPassword(uid, token, password);
+      
+      // Si la réinitialisation réussit et que nous recevons de nouveaux tokens
+      if (response.access && response.refresh) {
+        authService.setTokens({
+          access: response.access,
+          refresh: response.refresh
+        });
+        toast.success('Votre mot de passe a été réinitialisé avec succès');
+        navigate('/');
+      } else {
+        navigate('/login', { 
+          state: { message: 'Votre mot de passe a été réinitialisé avec succès. Veuillez vous connecter.' } 
+        });
+      }
     } catch (error: any) {
-      setError(error.message || 'Une erreur est survenue');
+      setError(error.message || 'Une erreur est survenue lors de la réinitialisation du mot de passe');
+      toast.error('Erreur lors de la réinitialisation du mot de passe');
     } finally {
       setIsLoading(false);
     }
@@ -116,7 +134,15 @@ function ResetPassword() {
             </div>
 
             {error && (
-              <div className="text-red-600 text-sm">{error}</div>
+              <div className="rounded-md bg-red-50 p-4">
+                <div className="flex">
+                  <div className="ml-3">
+                    <h3 className="text-sm font-medium text-red-800">
+                      {error}
+                    </h3>
+                  </div>
+                </div>
+              </div>
             )}
 
             <div>

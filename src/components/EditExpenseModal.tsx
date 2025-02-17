@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { X, Upload } from 'lucide-react';
-import type { Depense } from '../types';
+import type { Depense } from '../types/auth';
 
 interface EditExpenseModalProps {
   isOpen: boolean;

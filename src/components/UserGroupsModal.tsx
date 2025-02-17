@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { X, Shield, Save, XCircle } from 'lucide-react';
 import { authService } from '../services/authService';
-import type { Group, Permission } from '../types';
+import type { Group, Permission } from '../types/auth';
 
 interface UserGroupsModalProps {
   isOpen: boolean;

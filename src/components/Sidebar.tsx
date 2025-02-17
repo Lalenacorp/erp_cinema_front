@@ -23,7 +23,7 @@ const Sidebar = () => {
     { icon: <UserCog className="w-5 h-5" />, label: 'Utilisateurs', path: '/utilisateurs' },
     { icon: <UserCog className="w-5 h-5" />, label: 'Groupes', path: '/groupes' },
 
-    { icon: <Settings className="w-5 h-5" />, label: 'Paramètres', path: '/parametres' },
+   // { icon: <Settings className="w-5 h-5" />, label: 'Paramètres', path: '/parametres' },
   ];
 
   return (

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
-import type { Project } from '../types';
+import type { Project } from '../types/auth';
 
 interface EditProjectModalProps {
   isOpen: boolean;

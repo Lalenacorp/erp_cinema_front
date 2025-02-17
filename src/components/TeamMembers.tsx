@@ -1,5 +1,5 @@
 import React from 'react';
-import type { Intervenant } from '../types';
+import type { Intervenant } from '../types/auth';
 
 const TeamMembers = ({ members }: { members: Intervenant[] }) => {
   return (

@@ -19,30 +19,24 @@ import SetPassword from './pages/SetPassword';
 import GroupManagement from './pages/GroupManagement';
 import { authService } from './services/authService';
 
-
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate();
   
   useEffect(() => {
-    // Vérifier l'authentification
     const checkAuth = async () => {
       const token = authService.getToken();
-      if (!token || authService.isTokenExpired(token)) {  // Passer le token ici
-        // Si pas de token ou token expiré, rediriger vers la connexion
+      if (!token || authService.isTokenExpired(token)) {
         authService.removeTokens();
         navigate('/login');
       }
     };
-
-    
     
     checkAuth();
   }, [navigate]);
 
-  // Vérifier le token avant de rendre le contenu
   const token = authService.getToken();
-  if (!token || authService.isTokenExpired(token)) {  // Passer le token ici
-    return null; // Ne rien rendre pendant la redirection
+  if (!token || authService.isTokenExpired(token)) {
+    return null;
   }
 
   return (
@@ -58,14 +52,26 @@ function PrivateRoute({ children }: { children: React.ReactNode }) {
   );
 }
 
+function PublicRoute({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="min-h-screen bg-gray-100">
+      {children}
+    </div>
+  );
+}
+
 function App() {
   return (
     <Router>
       <Routes>
-        <Route path="/login" element={<Login />} />
-        <Route path="/forgot-password" element={<ForgotPassword />} />
-        <Route path="/reset-password" element={<ResetPassword />} />
-        <Route path="/set-password" element={<SetPassword />} />
+        {/* Routes publiques */}
+        <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
+        <Route path="/forgot-password" element={<PublicRoute><ForgotPassword /></PublicRoute>} />
+        <Route path="/reset-password" element={<PublicRoute><ResetPassword /></PublicRoute>} />
+        <Route path="/reset-password/:uid/:token" element={<PublicRoute><ResetPassword /></PublicRoute>} />
+        <Route path="/set-password" element={<PublicRoute><SetPassword /></PublicRoute>} />
+
+        {/* Routes protégées */}
         <Route path="/" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
         <Route path="/projets" element={<PrivateRoute><Projets /></PrivateRoute>} />
         <Route path="/projets/:id" element={<PrivateRoute><ProjectDetails /></PrivateRoute>} />
@@ -77,6 +83,8 @@ function App() {
         <Route path="/parametres" element={<PrivateRoute><Parametres /></PrivateRoute>} />
         <Route path="/profile" element={<PrivateRoute><Profile /></PrivateRoute>} />
         <Route path="/groupes" element={<PrivateRoute><GroupManagement /></PrivateRoute>} />
+        
+        {/* Redirection par défaut */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Router>

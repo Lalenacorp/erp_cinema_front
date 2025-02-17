@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { Film, Mail, Key, Eye, EyeOff } from 'lucide-react';
 import { authService } from '../services/authService';
-import { LoginRequest } from '../types'; 
+import { LoginRequest } from '../types/auth'; 
 
 function Login() {
   const navigate = useNavigate();

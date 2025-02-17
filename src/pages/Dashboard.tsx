@@ -1,80 +1,127 @@
 import React, { useState, useEffect } from 'react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import { Calendar, Clock, Film, Users } from 'lucide-react';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts';
+import { Calendar, Clock, Film, Users, DollarSign, TrendingUp, Activity } from 'lucide-react';
+import { projectService } from '../services/projectService';
+import { authService } from '../services/authService';
+import type { Project } from '../types';
+import { formatCurrency, formatDate, formatPercentage } from '../utils/formatters';
+import toast from 'react-hot-toast';
 
 function Dashboard() {
-  // Données statiques pour les projets
-  const [projects, setProjects] = useState([
-    {
-      name: 'Projet A',
-      status: 'En cours',
-      dateDebut: new Date('2024-01-01'),
-      dateFin: new Date('2024-06-30'),
-      budget: 100000,
-      current_expenses: 50000,
-      intervenants: ['Alice', 'Bob'],
-      activites: [{ dateDebut: new Date('2024-03-01'), description: 'Planification' }],
-      depenses: [{ date: new Date('2024-03-15'), montant: 50000 }],
-    },
-    {
-      name: 'Projet B',
-      status: 'En cours',
-      dateDebut: new Date('2024-02-01'),
-      dateFin: new Date('2024-07-31'),
-      budget: 120000,
-      current_expenses: 30000,
-      intervenants: ['Charlie', 'David'],
-      activites: [{ dateDebut: new Date('2024-04-01'), description: 'Écriture du script' }],
-      depenses: [{ date: new Date('2024-04-05'), montant: 30000 }],
-    },
-    {
-      name: 'Projet C',
-      status: 'Terminé',
-      dateDebut: new Date('2023-06-01'),
-      dateFin: new Date('2023-12-31'),
-      budget: 80000,
-      current_expenses: 80000,
-      intervenants: ['Eva', 'Frank'],
-      activites: [{ dateDebut: new Date('2023-08-01'), description: 'Montage final' }],
-      depenses: [{ date: new Date('2023-12-10'), montant: 80000 }],
-    },
-  ]);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [currentUser, setCurrentUser] = useState<any>(null);
 
   useEffect(() => {
-    // En attendant de charger les projets dynamiquement, on utilise les données statiques
+    loadData();
+    // Rafraîchir les données toutes les 5 minutes
+    const interval = setInterval(loadData, 5 * 60 * 1000);
+    return () => clearInterval(interval);
   }, []);
 
-  // Calcul des statistiques des projets
+  const loadData = async () => {
+    try {
+      setIsLoading(true);
+      const [projectsData, userData] = await Promise.all([
+        projectService.getProjects(),
+        authService.getCurrentUser()
+      ]);
+      
+      setProjects(projectsData);
+      setCurrentUser(userData);
+      setError(null);
+    } catch (err: any) {
+      setError(err.message || 'Erreur lors du chargement des données');
+      toast.error('Erreur lors du chargement des données');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Calculs des statistiques globales
   const totalProjects = projects.length;
-  const activeProjects = projects.filter(p => p.status !== 'Terminé').length;
+  const activeProjects = projects.filter(p => p.status === 'prod').length;
+  const totalBudget = projects.reduce((sum, p) => sum + parseFloat(p.budget), 0);
+  const totalExpenses = projects.reduce((sum, p) => sum + (p.current_expenses ? parseFloat(p.current_expenses) : 0), 0);
+  const budgetUtilization = totalBudget > 0 ? (totalExpenses / totalBudget) * 100 : 0;
+
+  // Calcul des projets avec échéances proches (7 jours)
   const upcomingDeadlines = projects.filter(p => {
-    const daysUntilEnd = Math.ceil((p.dateFin.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
-    return daysUntilEnd > 0 && daysUntilEnd <= 7;
+    if (!p.dateDebut) return false;
+    const daysUntilStart = Math.ceil((new Date(p.dateDebut).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
+    return daysUntilStart > 0 && daysUntilStart <= 7;
   }).length;
 
+  // Calcul de la durée moyenne des projets (en mois)
   const averageProjectDuration = projects.length > 0 
     ? projects.reduce((total, project) => {
-        const duration = Math.ceil((project.dateFin.getTime() - project.dateDebut.getTime()) / (1000 * 60 * 60 * 24 * 30));
+        const duration = Math.ceil((new Date().getTime() - new Date(project.dateDebut).getTime()) / (1000 * 60 * 60 * 24 * 30));
         return total + duration;
       }, 0) / projects.length
     : 0;
 
   // Données pour le graphique Budget vs Dépenses
-  const budgetData = projects.slice(0, 3).map(project => ({
+  const budgetData = projects.slice(0, 5).map(project => ({
     name: project.name,
-    budget: project.budget,
-    depense: project.current_expenses || 0
+    budget: parseFloat(project.budget),
+    depenses: project.current_expenses ? parseFloat(project.current_expenses) : 0,
+    ecart: parseFloat(project.budget) - (project.current_expenses ? parseFloat(project.current_expenses) : 0)
   }));
 
   // Données pour le graphique Statut des Projets
   const statusData = Object.entries(
     projects.reduce((acc, project) => {
-      acc[project.status] = (acc[project.status] || 0) + 1;
+      const status = project.status || 'prepa';
+      acc[status] = (acc[status] || 0) + 1;
       return acc;
     }, {} as Record<string, number>)
-  ).map(([name, value]) => ({ name, value }));
+  ).map(([name, value]) => ({ 
+    name: getStatusLabel(name), 
+    value 
+  }));
 
-  const COLORS = ['#3B82F6', '#10B981', '#8B5CF6', '#F59E0B'];
+  // Données pour le graphique d'évolution des dépenses
+  const expensesTrend = projects.map(project => ({
+    name: project.name,
+    montant: project.current_expenses ? parseFloat(project.current_expenses) : 0,
+    date: new Date(project.created_at).getTime()
+  })).sort((a, b) => a.date - b.date);
+
+  const COLORS = {
+    status: ['#3B82F6', '#10B981', '#8B5CF6', '#F59E0B'],
+    budget: {
+      total: '#3B82F6',
+      depenses: '#10B981',
+      ecart: '#EF4444'
+    }
+  };
+
+  function getStatusLabel(status: string): string {
+    switch (status) {
+      case 'prepa': return 'En préparation';
+      case 'pre-prod': return 'Pré-production';
+      case 'prod': return 'Production';
+      case 'post-prod': return 'Post-production';
+      default: return status;
+    }
+  }
+
+  if (isLoading) {
+    return (
+      <div className="flex justify-center items-center h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-100 border-t-blue-600"></div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="bg-red-50 text-red-600 p-4 rounded-lg">
+        {error}
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -83,7 +130,7 @@ function Dashboard() {
         <p className="text-gray-600">Vue d'ensemble de vos projets cinématographiques</p>
       </div>
 
-      {/* Statistiques rapides */}
+      {/* Statistiques principales */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <div className="bg-white rounded-xl p-6 shadow-sm">
           <div className="flex items-center justify-between mb-4">
@@ -91,26 +138,29 @@ function Dashboard() {
               <Film className="w-6 h-6 text-blue-600" />
             </div>
           </div>
-          <h3 className="text-gray-500 text-sm font-medium">Projets en cours</h3>
+          <h3 className="text-gray-500 text-sm font-medium">Projets actifs</h3>
           <div className="flex items-end justify-between mt-1">
             <p className="text-2xl font-semibold">{activeProjects}/{totalProjects}</p>
-            {totalProjects > 0 && (
-              <p className="text-sm font-medium">
-                <span className="text-blue-600">{activeProjects}</span> en cours
-              </p>
-            )}
+            <p className="text-sm font-medium">
+              <span className="text-blue-600">{formatPercentage(activeProjects/totalProjects)}</span>
+            </p>
           </div>
         </div>
 
         <div className="bg-white rounded-xl p-6 shadow-sm">
           <div className="flex items-center justify-between mb-4">
             <div className="bg-green-100 p-3 rounded-lg">
-              <Users className="w-6 h-6 text-green-600" />
+              <DollarSign className="w-6 h-6 text-green-600" />
             </div>
           </div>
-          <h3 className="text-gray-500 text-sm font-medium">Membres de l'équipe</h3>
+          <h3 className="text-gray-500 text-sm font-medium">Budget total</h3>
           <div className="flex items-end justify-between mt-1">
-            <p className="text-green-500 text-sm font-medium">Équipe totale</p>
+            <p className="text-2xl font-semibold">{formatCurrency(totalBudget)}</p>
+            <p className="text-sm font-medium">
+              <span className={budgetUtilization > 90 ? 'text-red-600' : 'text-green-600'}>
+                {formatPercentage(budgetUtilization)} utilisé
+              </span>
+            </p>
           </div>
         </div>
 
@@ -123,49 +173,52 @@ function Dashboard() {
           <h3 className="text-gray-500 text-sm font-medium">Échéances proches</h3>
           <div className="flex items-end justify-between mt-1">
             <p className="text-2xl font-semibold">{upcomingDeadlines}</p>
-            <p className="text-orange-500 text-sm font-medium">Cette semaine</p>
+            <p className="text-purple-600 text-sm font-medium">Cette semaine</p>
           </div>
         </div>
 
         <div className="bg-white rounded-xl p-6 shadow-sm">
           <div className="flex items-center justify-between mb-4">
             <div className="bg-orange-100 p-3 rounded-lg">
-              <Clock className="w-6 h-6 text-orange-600" />
+              <Activity className="w-6 h-6 text-orange-600" />
             </div>
           </div>
-          <h3 className="text-gray-500 text-sm font-medium">Temps moyen/projet</h3>
+          <h3 className="text-gray-500 text-sm font-medium">Activités en cours</h3>
           <div className="flex items-end justify-between mt-1">
-            <p className="text-2xl font-semibold">{averageProjectDuration.toFixed(1)} mois</p>
-            <p className="text-blue-500 text-sm font-medium">En moyenne</p>
+            <p className="text-2xl font-semibold">
+              {projects.reduce((sum, p) => sum + (p.activites?.length || 0), 0)}
+            </p>
+            <p className="text-orange-600 text-sm font-medium">Total</p>
           </div>
         </div>
       </div>
 
       {/* Graphiques */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Graphique Budget vs Dépenses */}
+        {/* Budget vs Dépenses */}
         <div className="bg-white rounded-xl p-6 shadow-sm">
           <h3 className="text-lg font-semibold mb-6">Budget vs Dépenses par Projet</h3>
           <div className="h-80">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart
-                data={budgetData}
-                margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
-              >
+              <BarChart data={budgetData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="name" />
                 <YAxis />
-                <Tooltip />
-                <Bar dataKey="budget" fill="#3B82F6" name="Budget" />
-                <Bar dataKey="depense" fill="#10B981" name="Dépenses" />
+                <Tooltip 
+                  formatter={(value: number) => formatCurrency(value)}
+                  labelStyle={{ color: '#374151' }}
+                />
+                <Bar dataKey="budget" fill={COLORS.budget.total} name="Budget" />
+                <Bar dataKey="depenses" fill={COLORS.budget.depenses} name="Dépenses" />
+                <Bar dataKey="ecart" fill={COLORS.budget.ecart} name="Écart" />
               </BarChart>
             </ResponsiveContainer>
           </div>
         </div>
 
-        {/* Graphique Statut des Projets */}
+        {/* Statut des Projets */}
         <div className="bg-white rounded-xl p-6 shadow-sm">
-          <h3 className="text-lg font-semibold mb-6">Répartition des Projets par Statut</h3>
+          <h3 className="text-lg font-semibold mb-6">Répartition par Statut</h3>
           <div className="h-80">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
@@ -180,7 +233,7 @@ function Dashboard() {
                   dataKey="value"
                 >
                   {statusData.map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                    <Cell key={`cell-${index}`} fill={COLORS.status[index % COLORS.status.length]} />
                   ))}
                 </Pie>
                 <Tooltip />
@@ -190,49 +243,72 @@ function Dashboard() {
         </div>
       </div>
 
+      {/* Évolution des dépenses */}
+      <div className="bg-white rounded-xl p-6 shadow-sm">
+        <h3 className="text-lg font-semibold mb-6">Évolution des Dépenses</h3>
+        <div className="h-80">
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart data={expensesTrend} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis 
+                dataKey="date" 
+                type="number"
+                domain={['dataMin', 'dataMax']}
+                tickFormatter={(timestamp) => formatDate(new Date(timestamp).toISOString())}
+              />
+              <YAxis />
+              <Tooltip 
+                formatter={(value: number) => formatCurrency(value)}
+                labelFormatter={(timestamp) => formatDate(new Date(timestamp).toISOString())}
+              />
+              <Line 
+                type="monotone" 
+                dataKey="montant" 
+                stroke="#3B82F6" 
+                strokeWidth={2}
+                dot={{ fill: '#3B82F6' }}
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+
       {/* Activités récentes */}
       <div className="bg-white rounded-xl p-6 shadow-sm">
         <h3 className="text-lg font-semibold mb-6">Activités Récentes</h3>
         <div className="space-y-4">
-          {projects.slice(0, 3).map((project, index) => {
-            const lastActivity = project.activites[project.activites.length - 1];
-            const lastExpense = project.depenses[project.depenses.length - 1];
+          {projects.slice(0, 5).map((project) => {
+            const lastActivity = project.activites?.[project.activites.length - 1];
+            const budget = parseFloat(project.budget);
+            const expenses = project.current_expenses ? parseFloat(project.current_expenses) : 0;
+            const progress = (expenses / budget) * 100;
             
-            let action = 'Mise à jour du projet';
-            let montant = null;
-            let date = project.dateDebut;
-
-            if (lastExpense && lastActivity) {
-              if (lastExpense.date > lastActivity.dateDebut!) {
-                action = 'Nouvelle dépense ajoutée';
-                montant = lastExpense.montant;
-                date = lastExpense.date;
-              } else {
-                action = 'Nouvelle activité ajoutée';
-                date = lastActivity.dateDebut!;
-              }
-            }
-
             return (
-              <div key={index} className="flex items-center justify-between py-3 border-b last:border-0">
+              <div key={project.id} className="flex items-center justify-between py-3 border-b last:border-0">
                 <div>
                   <p className="font-medium">{project.name}</p>
-                  <p className="text-sm text-gray-500">{action}</p>
+                  <p className="text-sm text-gray-500">
+                    {lastActivity ? lastActivity.name : getStatusLabel(project.status || 'prepa')}
+                  </p>
                 </div>
                 <div className="text-right">
-                  {montant && (
-                    <p className="font-medium text-green-600">
-                      {new Intl.NumberFormat('fr-FR', {
-                        style: 'currency',
-                        currency: 'EUR'
-                      }).format(montant)}
-                    </p>
-                  )}
-                  <p className="text-sm text-gray-500">
-                    {new Intl.DateTimeFormat('fr-FR', {
-                      day: 'numeric',
-                      month: 'long'
-                    }).format(date)}
+                  <div className="flex items-center gap-2">
+                    <div className="w-24 h-2 bg-gray-200 rounded-full">
+                      <div 
+                        className={`h-2 rounded-full ${
+                          progress > 90 ? 'bg-red-500' : 
+                          progress > 70 ? 'bg-yellow-500' : 
+                          'bg-green-500'
+                        }`}
+                        style={{ width: `${Math.min(progress, 100)}%` }}
+                      />
+                    </div>
+                    <span className="text-sm font-medium">
+                      {progress.toFixed(0)}%
+                    </span>
+                  </div>
+                  <p className="text-sm text-gray-500 mt-1">
+                    {formatDate(project.updated_at)}
                   </p>
                 </div>
               </div>

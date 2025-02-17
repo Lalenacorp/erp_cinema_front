@@ -1,4 +1,4 @@
-import { authService } from '../services/authService'; 
+import { authService } from './authService'; 
 
 export const groupManagement = {
   // Créer un groupe

@@ -1,295 +1,292 @@
-import React, { useState, useRef } from 'react';
-import { X, Upload } from 'lucide-react';
-import type { Depense, Project, Activite, SousActivite } from '../types';
+import React, { useState, useEffect } from 'react';
+import { X } from 'lucide-react';
+import type { Project, Activity, SubActivity } from '../types';
+import type { Expense } from '../types/expense';
+import { useWebSocket } from '../hooks/useWebSocket';
+import { apiService } from '../services/apiService';
+import toast from 'react-hot-toast';
 
 interface NewExpenseModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (expense: Omit<Depense, 'id'>) => void;
+  onSubmit: (expense: Expense) => void;
   projects: Project[];
-  selectedProjectId?: string;
 }
 
 const NewExpenseModal: React.FC<NewExpenseModalProps> = ({
   isOpen,
   onClose,
   onSubmit,
-  projects,
-  selectedProjectId
+  projects
 }) => {
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [expense, setExpense] = useState<Omit<Depense, 'id'>>({
-    description: '',
-    montant: 0,
-    justificatif: '',
-    date: new Date(),
-    sousActiviteId: ''
-  });
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [projectId, setProjectId] = useState(selectedProjectId || '');
-  const [selectedActivityId, setSelectedActivityId] = useState('');
+  const [selectedProject, setSelectedProject] = useState<string>('');
+  const [selectedActivity, setSelectedActivity] = useState<string>('');
+  const [selectedSubActivity, setSelectedSubActivity] = useState<string>('');
+  const [amount, setAmount] = useState<string>('');
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [activities, setActivities] = useState<Activity[]>([]);
+  const [isLoadingActivities, setIsLoadingActivities] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      if (!['application/pdf', 'image/jpeg', 'image/png'].includes(file.type)) {
-        alert('Seuls les fichiers PDF, JPEG et PNG sont acceptés');
-        return;
-      }
-      if (file.size > 5 * 1024 * 1024) {
-        alert('Le fichier ne doit pas dépasser 5MB');
-        return;
-      }
-      setSelectedFile(file);
-      setExpense({ ...expense, justificatif: file.name });
+  // Initialiser la connexion WebSocket quand un projet est sélectionné
+  const ws = useWebSocket(selectedProject, (data) => {
+    // Gérer les mises à jour WebSocket si nécessaire
+    console.log('WebSocket update:', data);
+  });
+
+  // Reset form when modal opens/closes
+  useEffect(() => {
+    if (!isOpen) {
+      setSelectedProject('');
+      setSelectedActivity('');
+      setSelectedSubActivity('');
+      setAmount('');
+      setErrors({});
+      setActivities([]);
+      setIsSubmitting(false);
     }
+  }, [isOpen]);
+
+  // Charger les activités quand un projet est sélectionné
+  useEffect(() => {
+    if (selectedProject) {
+      loadActivities();
+    } else {
+      setActivities([]);
+      setSelectedActivity('');
+      setSelectedSubActivity('');
+    }
+  }, [selectedProject]);
+
+  const loadActivities = async () => {
+    setIsLoadingActivities(true);
+    try {
+      const projectActivities = await apiService.listActivities();
+      // Filtrer les activités pour ne garder que celles du projet sélectionné
+      const filteredActivities = projectActivities.filter(
+        activity => activity.project === parseInt(selectedProject)
+      );
+      setActivities(filteredActivities);
+    } catch (error) {
+      console.error('Erreur lors du chargement des activités:', error);
+      toast.error('Erreur lors du chargement des activités');
+    } finally {
+      setIsLoadingActivities(false);
+    }
+  };
+
+  const validateForm = (): boolean => {
+    const newErrors: Record<string, string> = {};
+
+    if (!selectedProject) {
+      newErrors.project = 'Le projet est requis';
+    }
+    if (!selectedActivity) {
+      newErrors.activity = "L'activité est requise";
+    }
+    if (!selectedSubActivity) {
+      newErrors.subactivity = 'La sous-activité est requise';
+    }
+    if (!amount || parseFloat(amount) <= 0) {
+      newErrors.amount = 'Le montant doit être supérieur à 0';
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (isSubmitting) return;
-    
-    if (!projectId) {
-      alert('Veuillez sélectionner un projet');
-      return;
-    }
 
-    if (!expense.sousActiviteId) {
-      alert('Veuillez sélectionner une sous-activité');
+    if (!validateForm()) {
+      toast.error('Veuillez corriger les erreurs avant de continuer');
       return;
     }
 
     setIsSubmitting(true);
 
     try {
-      if (selectedFile) {
-        const base64String = await new Promise<string>((resolve) => {
-          const reader = new FileReader();
-          reader.onloadend = () => {
-            resolve(reader.result as string);
-          };
-          reader.readAsDataURL(selectedFile);
-        });
-
-        await onSubmit({
-          ...expense,
-          justificatif: base64String
-        });
-      } else {
-        await onSubmit(expense);
+      if (!ws) {
+        throw new Error('La connexion WebSocket n\'est pas disponible');
       }
 
-      handleClose();
+      // Correction du format du message selon la documentation
+      const message = {
+        action: 'update_expense',
+        subactivity_id: parseInt(selectedSubActivity),
+        amount_spent: parseFloat(amount)
+      };
+
+      ws.send(JSON.stringify(message));
+
+      // Réinitialiser le formulaire et fermer le modal
+      setAmount('');
+      setSelectedSubActivity('');
+      onClose();
+      toast.success('Dépense créée avec succès');
     } catch (error) {
-      console.error('Erreur lors de l\'ajout de la dépense:', error);
-      alert('Une erreur est survenue lors de l\'ajout de la dépense');
+      console.error('Erreur lors de la création de la dépense:', error);
+      toast.error("Erreur lors de la création de la dépense");
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const handleClose = () => {
-    setExpense({
-      description: '',
-      montant: 0,
-      justificatif: '',
-      date: new Date(),
-      sousActiviteId: ''
-    });
-    setSelectedFile(null);
-    setProjectId(selectedProjectId || '');
-    setSelectedActivityId('');
-    setIsSubmitting(false);
-    onClose();
-  };
-
   if (!isOpen) return null;
-
-  const selectedProject = projects.find(p => p.id === projectId);
-  const selectedActivity = selectedProject?.activites.find(a => a.id === selectedActivityId);
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-xl w-full max-w-2xl p-6">
+      <div className="bg-white rounded-xl w-full max-w-lg p-6">
         <div className="flex justify-between items-center mb-6">
-          <h2 className="text-2xl font-bold">Nouvelle Dépense</h2>
-          <button onClick={handleClose} className="text-gray-500 hover:text-gray-700">
+          <div>
+            <h2 className="text-2xl font-bold">Nouvelle dépense</h2>
+            <p className="text-gray-600 mt-1">Ajoutez une nouvelle dépense</p>
+          </div>
+          <button
+            onClick={onClose}
+            className="text-gray-500 hover:text-gray-700 transition-colors"
+          >
             <X className="w-6 h-6" />
           </button>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
           {/* Sélection du projet */}
-          {!selectedProjectId && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Projet *
-              </label>
-              <select
-                value={projectId}
-                onChange={(e) => {
-                  setProjectId(e.target.value);
-                  setSelectedActivityId('');
-                  setExpense(prev => ({ ...prev, sousActiviteId: '' }));
-                }}
-                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
-                required
-              >
-                <option value="">Sélectionnez un projet</option>
-                {projects.map((project) => (
-                  <option key={project.id} value={project.id}>
-                    {project.nom}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
-
-          {/* Sélection de l'activité */}
-          {selectedProject && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Activité *
-              </label>
-              <select
-                value={selectedActivityId}
-                onChange={(e) => {
-                  setSelectedActivityId(e.target.value);
-                  setExpense(prev => ({ ...prev, sousActiviteId: '' }));
-                }}
-                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
-                required
-              >
-                <option value="">Sélectionnez une activité</option>
-                {selectedProject.activites.map((activite) => (
-                  <option key={activite.id} value={activite.id}>
-                    {activite.nom}
-                  </option>
-                ))}
-              </select>
-            </div>
-          )}
-
-          {/* Sélection de la sous-activité */}
-          {selectedActivity && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Sous-activité *
-              </label>
-              <select
-                value={expense.sousActiviteId}
-                onChange={(e) => setExpense({ ...expense, sousActiviteId: e.target.value })}
-                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
-                required
-              >
-                <option value="">Sélectionnez une sous-activité</option>
-                {selectedActivity.sousActivites.map((sousActivite) => (
-                  <option key={sousActivite.id} value={sousActivite.id}>
-                    {sousActivite.nom}
-                  </option>
-                ))}
-              </select>
-              {selectedActivity.sousActivites.length === 0 && (
-                <p className="text-sm text-red-600 mt-1">
-                  Aucune sous-activité n'existe pour cette activité. Veuillez d'abord créer une sous-activité.
-                </p>
-              )}
-            </div>
-          )}
-
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Description *
+              Projet <span className="text-red-500">*</span>
             </label>
-            <input
-              type="text"
-              value={expense.description}
-              onChange={(e) => setExpense({ ...expense, description: e.target.value })}
-              className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
-              required
-            />
+            <select
+              value={selectedProject}
+              onChange={(e) => {
+                setSelectedProject(e.target.value);
+                setSelectedActivity('');
+                setSelectedSubActivity('');
+                setErrors({ ...errors, project: '' });
+              }}
+              className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${
+                errors.project ? 'border-red-500' : 'border-gray-300'
+              }`}
+              disabled={isSubmitting}
+            >
+              <option value="">Sélectionnez un projet</option>
+              {projects.map((project) => (
+                <option key={project.id} value={project.id}>
+                  {project.name}
+                </option>
+              ))}
+            </select>
+            {errors.project && (
+              <p className="mt-1 text-sm text-red-500">{errors.project}</p>
+            )}
           </div>
 
+          {/* Sélection de l'activité */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Montant (€) *
+              Activité <span className="text-red-500">*</span>
+            </label>
+            <select
+              value={selectedActivity}
+              onChange={(e) => {
+                setSelectedActivity(e.target.value);
+                setSelectedSubActivity('');
+                setErrors({ ...errors, activity: '' });
+              }}
+              className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${
+                errors.activity ? 'border-red-500' : 'border-gray-300'
+              }`}
+              disabled={!selectedProject || isLoadingActivities || isSubmitting}
+            >
+              <option value="">Sélectionnez une activité</option>
+              {activities.map((activity) => (
+                <option key={activity.id} value={activity.id}>
+                  {activity.name}
+                </option>
+              ))}
+            </select>
+            {errors.activity && (
+              <p className="mt-1 text-sm text-red-500">{errors.activity}</p>
+            )}
+          </div>
+
+          {/* Sélection de la sous-activité */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Sous-activité <span className="text-red-500">*</span>
+            </label>
+            <select
+              value={selectedSubActivity}
+              onChange={(e) => {
+                setSelectedSubActivity(e.target.value);
+                setErrors({ ...errors, subactivity: '' });
+              }}
+              className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${
+                errors.subactivity ? 'border-red-500' : 'border-gray-300'
+              }`}
+              disabled={!selectedActivity || isSubmitting}
+            >
+              <option value="">Sélectionnez une sous-activité</option>
+              {activities
+                .find(a => a.id.toString() === selectedActivity)
+                ?.activity_subactivity.map((subActivity) => (
+                  <option key={subActivity.id} value={subActivity.id}>
+                    {subActivity.name}
+                  </option>
+                ))}
+            </select>
+            {errors.subactivity && (
+              <p className="mt-1 text-sm text-red-500">{errors.subactivity}</p>
+            )}
+          </div>
+
+          {/* Montant */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Montant <span className="text-red-500">*</span>
             </label>
             <input
               type="number"
-              step="0.01"
+              value={amount}
+              onChange={(e) => {
+                setAmount(e.target.value);
+                setErrors({ ...errors, amount: '' });
+              }}
+              className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${
+                errors.amount ? 'border-red-500' : 'border-gray-300'
+              }`}
               min="0"
-              value={expense.montant || ''}
-              onChange={(e) => setExpense({ ...expense, montant: parseFloat(e.target.value) || 0 })}
-              className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
-              required
+              step="0.01"
+              placeholder="Montant de la dépense"
+              disabled={isSubmitting}
             />
+            {errors.amount && (
+              <p className="mt-1 text-sm text-red-500">{errors.amount}</p>
+            )}
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Date *
-            </label>
-            <input
-              type="date"
-              value={expense.date.toISOString().split('T')[0]}
-              onChange={(e) => setExpense({ ...expense, date: new Date(e.target.value) })}
-              className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
-              required
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Justificatif
-            </label>
-            <input
-              type="file"
-              ref={fileInputRef}
-              onChange={handleFileChange}
-              accept=".pdf,.jpg,.jpeg,.png"
-              className="hidden"
-            />
-            <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-lg">
-              <div className="space-y-1 text-center">
-                <Upload className="mx-auto h-12 w-12 text-gray-400" />
-                <div className="flex text-sm text-gray-600">
-                  <button
-                    type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    className="relative font-medium text-blue-600 hover:text-blue-500 focus:outline-none"
-                  >
-                    {selectedFile ? 'Changer le fichier' : 'Télécharger un fichier'}
-                  </button>
-                </div>
-                <p className="text-xs text-gray-500">
-                  PDF, PNG, JPG jusqu'à 5MB
-                </p>
-                {selectedFile && (
-                  <p className="text-sm text-gray-600">
-                    Fichier sélectionné : {selectedFile.name}
-                  </p>
-                )}
-              </div>
-            </div>
-          </div>
-
-          <div className="flex justify-end gap-3 pt-4">
+          <div className="flex justify-end gap-3">
             <button
               type="button"
-              onClick={handleClose}
-              className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg"
+              onClick={onClose}
+              className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
               disabled={isSubmitting}
             >
               Annuler
             </button>
             <button
               type="submit"
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-              disabled={isSubmitting || !selectedActivity || selectedActivity.sousActivites.length === 0}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 disabled:opacity-50"
+              disabled={isSubmitting}
             >
-              {isSubmitting ? 'Ajout en cours...' : 'Ajouter la dépense'}
+              {isSubmitting ? (
+                <>
+                  <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+                  Création...
+                </>
+              ) : (
+                'Créer la dépense'
+              )}
             </button>
           </div>
         </form>
@@ -299,3 +296,4 @@ const NewExpenseModal: React.FC<NewExpenseModalProps> = ({
 };
 
 export default NewExpenseModal;
+

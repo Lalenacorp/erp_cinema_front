@@ -1,5 +1,5 @@
 import { api } from '../lib/api'; 
-import type { User, AuthTokens, LoginRequest, Group, Permission } from '../types';
+import type { User, AuthTokens, LoginRequest, Group, Permission,  ResetPasswordResponse } from '../types/auth';
 import { jwtDecode } from 'jwt-decode';  
 
 
@@ -79,7 +79,7 @@ export const authService = {
   },
 
   // Récupérer l'utilisateur courant à partir du token
-  async getCurrentUser(): Promise<User | null> {
+/*   async getCurrentUser(): Promise<User | null> {
     try {
       const token = this.getToken();
       if (!token || this.isTokenExpired(token)) return null;
@@ -99,8 +99,95 @@ export const authService = {
       console.error('Erreur lors de la récupération de l\'utilisateur:', error);
       return null;
     }
-  },
+  }, */
 
+  async getCurrentUser(): Promise<User | null> {
+    try {
+      let token = this.getToken();
+      if (!token) {
+        return null;
+      }
+
+      // Si le token est expiré, essayer de le rafraîchir
+      if (this.isTokenExpired(token)) {
+        const newTokens = await this.refreshAccessToken();
+        if (!newTokens) {
+          this.removeTokens();
+          return null;
+        }
+        token = newTokens.access;
+      }
+
+      // Décoder le token pour obtenir l'ID de l'utilisateur
+      const decoded: any = jwtDecode(token);
+      const userId = decoded.user_id;
+
+      if (!userId) {
+        this.removeTokens();
+        return null;
+      }
+
+      const response = await fetch(`http://13.38.119.12/api/users/${userId}/`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        // Si le token est invalide, essayer de le rafraîchir une dernière fois
+        if (response.status === 403) {
+          const newTokens = await this.refreshAccessToken();
+          if (!newTokens) {
+            this.removeTokens();
+            return null;
+          }
+          
+          // Réessayer avec le nouveau token
+          const retryResponse = await fetch(`http://13.38.119.12/api/users/${userId}/`, {
+            headers: {
+              'Authorization': `Bearer ${newTokens.access}`,
+              'Content-Type': 'application/json'
+            }
+          });
+
+          if (!retryResponse.ok) {
+            this.removeTokens();
+            return null;
+          }
+
+          const data = await retryResponse.json();
+          return {
+            id: data.id,
+            username: data.username || '',
+            email: data.email || '',
+            first_name: data.first_name || '',
+            last_name: data.last_name || '',
+            password: '',
+            groups: data.groups || []
+          };
+        }
+
+        throw new Error('Erreur lors de la récupération des données utilisateur');
+      }
+
+      const data = await response.json();
+      return {
+        id: data.id,
+        username: data.username || '',
+        email: data.email || '',
+        first_name: data.first_name || '',
+        last_name: data.last_name || '',
+        password: '',
+        groups: data.groups || []
+      };
+    } catch (error) {
+      console.error('Erreur de récupération de l\'utilisateur:', error);
+      this.removeTokens();
+      return null;
+    }
+  },
+  
   // Vérifier si le token est expiré
   isTokenExpired(token: string): boolean {
     try {
@@ -112,26 +199,8 @@ export const authService = {
     }
   },
 
-  // Demander une réinitialisation du mot de passe
-  async requestPasswordReset(email: string): Promise<void> {
-    try {
-      if (!email) {
-        throw new Error("L'adresse email est requise.");
-      }
 
-      const emailRegex = /^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,4}$/;
-      if (!emailRegex.test(email)) {
-        throw new Error("Adresse email invalide.");
-      }
-
-      await api.post('/api/forgot-password/', { email });
-      console.log('Demande de réinitialisation du mot de passe envoyée avec succès.');
-    } catch (error: any) {
-      const errorMessage = error.response ? error.response.data.message : error.message || 'Une erreur est survenue';
-      console.error('Erreur lors de la demande de réinitialisation du mot de passe:', errorMessage);
-      throw new Error(errorMessage);
-    }
-  },
+ 
 
   // Obtenir la liste de tous les utilisateurs
 // Exemple de récupération des utilisateurs
@@ -522,23 +591,67 @@ async updateGroupPermissions(groupId: string, permissions: number[]): Promise<Gr
   }
 },
 
-async resetPassword(uid: string | null, token: string | null, password: string): Promise<void> {
+async resetPassword(uid: string, token: string, newPassword: string): Promise<ResetPasswordResponse> {
   try {
-    // Vérifier si l'uid et le token sont présents
-    if (!uid || !token) {
-      throw new Error('UID ou Token manquant');
+    const response = await fetch(`http://13.38.119.12/api/reset-password/${uid}/${token}/`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        new_password: newPassword,
+        confirm_password: newPassword,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Erreur lors de la réinitialisation du mot de passe');
     }
 
-    // Construire l'URL avec l'uid et le token
-    const url = `/api/reset-password/${uid}/${token}/`;
-
-    // Envoyer la requête POST avec le nouveau mot de passe
-    await api.post(url, { new_password: password, confirm_password: password });
-  } catch (error) {
-    throw new Error('Une erreur est survenue lors de la réinitialisation du mot de passe');
+    const data = await response.json();
+    return data as ResetPasswordResponse;
+  } catch (error: any) {
+    console.error('Erreur de réinitialisation du mot de passe:', error);
+    throw new Error(error.message || 'Erreur lors de la réinitialisation du mot de passe');
   }
 },
 
+async changePassword(userId: string, oldPassword: string, newPassword: string): Promise<void> {
+  const token = this.getToken();
+  if (!token) throw new Error('Non authentifié');
+
+  try {
+    await api.post(`/api/users/${userId}/change-password/`, {
+      old_password: oldPassword,
+      new_password: newPassword
+    });
+  } catch (error: any) {
+    console.error('Erreur de changement de mot de passe:', error);
+    throw new Error(error.response?.data?.message || 'Erreur de changement de mot de passe');
+  }
+},
+
+  // Mot de pass oublié
+async requestPasswordReset(email: string): Promise<void> {
+  try {
+    const response = await fetch('http://13.38.119.12/api/forgot-password/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ email }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Erreur lors de la demande de réinitialisation');
+    }
+  } catch (error: any) {
+    console.error('Erreur de demande de réinitialisation:', error);
+    throw new Error(error.message || 'Erreur lors de la demande de réinitialisation');
+  }
+},
 
 
 

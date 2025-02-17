@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, UserCog, Shield, Users as UsersIcon, Eye } from 'lucide-react';
 import { authService } from '../services/authService';
-import type { User, Group } from '../types';
+import type { User, Group } from '../types/auth';
 import UserGroupsModal from '../components/UserGroupsModal';
 import InviteUserModal from '../components/InviteUserModal';
 import UserDetails from '../components/UserDetails';

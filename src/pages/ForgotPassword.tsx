@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Film, Mail, ArrowLeft } from 'lucide-react';
 import { authService } from '../services/authService';
+import toast from 'react-hot-toast';
 
 function ForgotPassword() {
   const [email, setEmail] = useState('');
@@ -11,18 +12,18 @@ function ForgotPassword() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError(''); // Réinitialise les erreurs avant chaque soumission
+    setError('');
     setIsLoading(true);
 
     try {
-      // Appel du service de réinitialisation de mot de passe
       await authService.requestPasswordReset(email);
-      setIsEmailSent(true); // L'email a été envoyé avec succès
+      setIsEmailSent(true);
+      toast.success('Email de réinitialisation envoyé');
     } catch (error: any) {
-      // Gestion des erreurs d'API
       setError(error.message || 'Une erreur est survenue');
+      toast.error('Erreur lors de l\'envoi de l\'email');
     } finally {
-      setIsLoading(false); // Arrête l'animation de chargement
+      setIsLoading(false);
     }
   };
 
@@ -68,7 +69,15 @@ function ForgotPassword() {
               </div>
 
               {error && (
-                <div className="text-red-600 text-sm">{error}</div> // Affichage des erreurs
+                <div className="rounded-md bg-red-50 p-4">
+                  <div className="flex">
+                    <div className="ml-3">
+                      <h3 className="text-sm font-medium text-red-800">
+                        {error}
+                      </h3>
+                    </div>
+                  </div>
+                </div>
               )}
 
               <div>
