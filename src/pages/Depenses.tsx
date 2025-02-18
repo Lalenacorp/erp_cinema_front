@@ -7,6 +7,7 @@ import type { Expense, ExpenseUpdateResponse } from '../types/expense';
 import { ExpenseList } from '../components/ExpenseList';
 import NewExpenseModal from '../components/NewExpenseModal';
 import toast from 'react-hot-toast';
+import { authService } from '../services/authService';
 
 function Depenses() {
   const [projects, setProjects] = useState<Project[]>([]);
@@ -16,7 +17,24 @@ function Depenses() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    loadProjects();
+    // Vérifier l'authentification avant de charger les données
+    const checkAuthAndLoadData = async () => {
+      try {
+        const token = authService.getToken();
+        if (!token || authService.isTokenExpired(token)) {
+          const newTokens = await authService.refreshAccessToken();
+          if (!newTokens) {
+            throw new Error('Session expirée');
+          }
+        }
+        await loadProjects();
+      } catch (error) {
+        console.error('Erreur d\'authentification:', error);
+        authService.logout();
+      }
+    };
+
+    checkAuthAndLoadData();
   }, []);
 
   const loadProjects = async () => {
@@ -37,16 +55,6 @@ function Depenses() {
     // Mettre à jour l'interface utilisateur avec les nouvelles données
     console.log('Mise à jour des dépenses:', data);
     loadProjects(); // Recharger les projets pour avoir les montants à jour
-  };
-
-  const handleAddExpense = async (expense: Expense) => {
-    try {
-      // La logique d'ajout est maintenant gérée via WebSocket dans le modal
-      toast.success('Dépense ajoutée avec succès');
-      setIsNewExpenseModalOpen(false);
-    } catch (error) {
-      toast.error("Erreur lors de l'ajout de la dépense");
-    }
   };
 
   if (isLoading) {
@@ -123,8 +131,8 @@ function Depenses() {
       <NewExpenseModal
         isOpen={isNewExpenseModalOpen}
         onClose={() => setIsNewExpenseModalOpen(false)}
-        onSubmit={handleAddExpense}
         projects={projects}
+        onExpenseUpdate={handleExpenseUpdate}
       />
     </div>
   );

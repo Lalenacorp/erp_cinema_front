@@ -238,26 +238,30 @@ function ProjectDetails() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mt-6">
-            <StatCard
-              icon={DollarSign}
-              title="Budget total"
-              value={project.budget}
-              bgColor="bg-blue-50"
-              iconColor="bg-blue-100 text-blue-600"
-            >
-              <div className="mt-2 space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">Dépensé :</span>
-                  <span className="font-medium">{project.current_expenses || '0'}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-600">Écart :</span>
-                  <span className={`font-medium ${Number(project.budget_gap) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                    {project.budget_gap || '0'}
-                  </span>
-                </div>
-              </div>
-            </StatCard>
+            
+          <StatCard
+  icon={DollarSign}
+  title="Budget total"
+  value={`${project.budget} ${project.currency}`}
+  bgColor="bg-blue-50"
+  iconColor="bg-blue-100 text-blue-600"
+>
+  <div className="mt-2 space-y-2">
+    <div className="flex justify-between text-sm">
+      <span className="text-gray-600">Dépensé :</span>
+      <span className="font-medium">
+        {project.current_expenses || '0'} {project.currency}
+      </span>
+    </div>
+    <div className="flex justify-between text-sm">
+      <span className="text-gray-600">Écart :</span>
+      <span className={`font-medium ${Number(project.budget_gap) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+        {project.budget_gap || '0'} {project.currency}
+      </span>
+    </div>
+  </div>
+</StatCard>
+
 
             <StatCard
               icon={Calendar}

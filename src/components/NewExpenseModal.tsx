@@ -1,72 +1,71 @@
 import React, { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
-import type { Project, Activity, SubActivity } from '../types';
-import type { Expense } from '../types/expense';
+import type { Project, Activity } from '../types';
+import type { ExpenseUpdateResponse } from '../types/expense';
 import { useWebSocket } from '../hooks/useWebSocket';
-import { apiService } from '../services/apiService';
+import { activityService } from '../services/activityService';
 import toast from 'react-hot-toast';
 
 interface NewExpenseModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (expense: Expense) => void;
   projects: Project[];
+  onExpenseUpdate: (data: ExpenseUpdateResponse) => void;
 }
 
 const NewExpenseModal: React.FC<NewExpenseModalProps> = ({
   isOpen,
   onClose,
-  onSubmit,
-  projects
+  projects,
+  onExpenseUpdate
 }) => {
   const [selectedProject, setSelectedProject] = useState<string>('');
   const [selectedActivity, setSelectedActivity] = useState<string>('');
   const [selectedSubActivity, setSelectedSubActivity] = useState<string>('');
+  const [name, setName] = useState<string>('');
   const [amount, setAmount] = useState<string>('');
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [activities, setActivities] = useState<Activity[]>([]);
   const [isLoadingActivities, setIsLoadingActivities] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Initialiser la connexion WebSocket quand un projet est sélectionné
-  const ws = useWebSocket(selectedProject, (data) => {
-    // Gérer les mises à jour WebSocket si nécessaire
-    console.log('WebSocket update:', data);
-  });
+  const ws = useWebSocket(selectedProject, onExpenseUpdate);
 
-  // Reset form when modal opens/closes
   useEffect(() => {
     if (!isOpen) {
-      setSelectedProject('');
-      setSelectedActivity('');
-      setSelectedSubActivity('');
-      setAmount('');
-      setErrors({});
-      setActivities([]);
-      setIsSubmitting(false);
+      resetForm();
     }
   }, [isOpen]);
 
-  // Charger les activités quand un projet est sélectionné
   useEffect(() => {
     if (selectedProject) {
       loadActivities();
     } else {
       setActivities([]);
-      setSelectedActivity('');
-      setSelectedSubActivity('');
     }
   }, [selectedProject]);
 
+  const resetForm = () => {
+    setSelectedProject('');
+    setSelectedActivity('');
+    setSelectedSubActivity('');
+    setName('');
+    setAmount('');
+    setErrors({});
+    setIsSubmitting(false);
+    setActivities([]);
+  };
+
   const loadActivities = async () => {
+    if (!selectedProject) return;
+
     setIsLoadingActivities(true);
     try {
-      const projectActivities = await apiService.listActivities();
-      // Filtrer les activités pour ne garder que celles du projet sélectionné
-      const filteredActivities = projectActivities.filter(
+      const allActivities = await activityService.listActivities();
+      const projectActivities = allActivities.filter(
         activity => activity.project === parseInt(selectedProject)
       );
-      setActivities(filteredActivities);
+      setActivities(projectActivities);
     } catch (error) {
       console.error('Erreur lors du chargement des activités:', error);
       toast.error('Erreur lors du chargement des activités');
@@ -87,6 +86,9 @@ const NewExpenseModal: React.FC<NewExpenseModalProps> = ({
     if (!selectedSubActivity) {
       newErrors.subactivity = 'La sous-activité est requise';
     }
+    if (!name.trim()) {
+      newErrors.name = 'Le nom de la dépense est requis';
+    }
     if (!amount || parseFloat(amount) <= 0) {
       newErrors.amount = 'Le montant doit être supérieur à 0';
     }
@@ -106,33 +108,33 @@ const NewExpenseModal: React.FC<NewExpenseModalProps> = ({
     setIsSubmitting(true);
 
     try {
-      if (!ws) {
+      if (!ws.isConnected) {
         throw new Error('La connexion WebSocket n\'est pas disponible');
       }
 
-      // Correction du format du message selon la documentation
-      const message = {
-        action: 'update_expense',
-        subactivity_id: parseInt(selectedSubActivity),
-        amount_spent: parseFloat(amount)
-      };
+      const success = ws.updateExpense(
+        parseInt(selectedSubActivity),
+        parseFloat(amount),
+        name.trim()
+      );
 
-      ws.send(JSON.stringify(message));
-
-      // Réinitialiser le formulaire et fermer le modal
-      setAmount('');
-      setSelectedSubActivity('');
-      onClose();
-      toast.success('Dépense créée avec succès');
+      if (success) {
+        resetForm();
+        onClose();
+        toast.success('Dépense ajoutée avec succès');
+      }
     } catch (error) {
-      console.error('Erreur lors de la création de la dépense:', error);
-      toast.error("Erreur lors de la création de la dépense");
+      console.error('Erreur lors de l\'ajout de la dépense:', error);
+      toast.error("Erreur lors de l'ajout de la dépense");
     } finally {
       setIsSubmitting(false);
     }
   };
 
   if (!isOpen) return null;
+
+  const selectedActivityData = activities.find(a => a.id.toString() === selectedActivity);
+  const subActivities = selectedActivityData?.activity_subactivity || [];
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -151,7 +153,6 @@ const NewExpenseModal: React.FC<NewExpenseModalProps> = ({
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Sélection du projet */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Projet <span className="text-red-500">*</span>
@@ -181,7 +182,6 @@ const NewExpenseModal: React.FC<NewExpenseModalProps> = ({
             )}
           </div>
 
-          {/* Sélection de l'activité */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Activité <span className="text-red-500">*</span>
@@ -196,7 +196,7 @@ const NewExpenseModal: React.FC<NewExpenseModalProps> = ({
               className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${
                 errors.activity ? 'border-red-500' : 'border-gray-300'
               }`}
-              disabled={!selectedProject || isLoadingActivities || isSubmitting}
+              disabled={!selectedProject || isSubmitting || isLoadingActivities}
             >
               <option value="">Sélectionnez une activité</option>
               {activities.map((activity) => (
@@ -210,7 +210,6 @@ const NewExpenseModal: React.FC<NewExpenseModalProps> = ({
             )}
           </div>
 
-          {/* Sélection de la sous-activité */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Sous-activité <span className="text-red-500">*</span>
@@ -227,20 +226,39 @@ const NewExpenseModal: React.FC<NewExpenseModalProps> = ({
               disabled={!selectedActivity || isSubmitting}
             >
               <option value="">Sélectionnez une sous-activité</option>
-              {activities
-                .find(a => a.id.toString() === selectedActivity)
-                ?.activity_subactivity.map((subActivity) => (
-                  <option key={subActivity.id} value={subActivity.id}>
-                    {subActivity.name}
-                  </option>
-                ))}
+              {subActivities.map((subActivity) => (
+                <option key={subActivity.id} value={subActivity.id}>
+                  {subActivity.name}
+                </option>
+              ))}
             </select>
             {errors.subactivity && (
               <p className="mt-1 text-sm text-red-500">{errors.subactivity}</p>
             )}
           </div>
 
-          {/* Montant */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Nom de la dépense <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              value={name}
+              onChange={(e) => {
+                setName(e.target.value);
+                setErrors({ ...errors, name: '' });
+              }}
+              className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${
+                errors.name ? 'border-red-500' : 'border-gray-300'
+              }`}
+              placeholder="Ex: Achat de matériel"
+              disabled={isSubmitting}
+            />
+            {errors.name && (
+              <p className="mt-1 text-sm text-red-500">{errors.name}</p>
+            )}
+          </div>
+
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Montant <span className="text-red-500">*</span>
@@ -277,15 +295,15 @@ const NewExpenseModal: React.FC<NewExpenseModalProps> = ({
             <button
               type="submit"
               className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2 disabled:opacity-50"
-              disabled={isSubmitting}
+              disabled={isSubmitting || !ws.isConnected}
             >
               {isSubmitting ? (
                 <>
                   <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
-                  Création...
+                  Ajout en cours...
                 </>
               ) : (
-                'Créer la dépense'
+                'Ajouter la dépense'
               )}
             </button>
           </div>
@@ -296,4 +314,3 @@ const NewExpenseModal: React.FC<NewExpenseModalProps> = ({
 };
 
 export default NewExpenseModal;
-

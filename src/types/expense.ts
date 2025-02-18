@@ -1,5 +1,6 @@
 export interface Expense {
   id: number;
+  name: string;
   amount: string;
   created_at: string;
   updated_at: string;
@@ -9,6 +10,7 @@ export interface Expense {
 
 export interface ExpenseUpdateResponse {
   project_id: string;
+  name: string;
   current_expenses: string;
   budget_gap: string;
   activity_gap: string;

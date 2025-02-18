@@ -8,7 +8,6 @@ export interface Project {
   description: string | null;
   created_at: string;
   updated_at: string;
-  dateDebut: string;
   status?: ProjectStatus;
   budget: string;
   current_expenses: string | null;
@@ -16,20 +15,30 @@ export interface Project {
   currency: string;
   exchange_rate: string;
   managed_by: number;
-  activites: Activity[]; // Array of activities
+  activites: Activity[];
+  started_at: string; // date de début
+  achieved_at: string; // date de fin
 }
 
 export interface CreateProjectRequest {
   name: string;
-  budget: number;
+  budget: string;
   status: ProjectStatus;
   managed_by: number;
+  currency: string;
+  exchange_rate: string;
+  started_at: Date;
+  achieved_at: Date;
 }
 
 export interface UpdateProjectRequest {
   name?: string;
   description?: string;
   status?: ProjectStatus;
+  currency?: string;
+  exchange_rate?: string;
+  started_at?: string;
+  achieved_at?: string;
 }
 
 export interface ListProjectsResponse {

@@ -22,13 +22,20 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
     managed_by: 1,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
-    dateDebut: new Date().toISOString(),
     current_expenses: null,
     budget_gap: null,
-    currency: 'EUR',
-    exchange_rate: '1',
-    activites: []
+    currency: 'FCFA',
+    exchange_rate: '650',
+    activites: [],
+    started_at: new Date().toISOString(),
+    achieved_at: new Date().toISOString()
   });
+
+  const CURRENCIES = [
+    { code: 'FCFA', label: 'FCFA', rate: '650' },
+    { code: 'Euro', label: 'Euro (€)', rate: '1' },
+    { code: 'Dollar', label: 'Dollar ($)', rate: '600' }
+  ];
 
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -41,6 +48,26 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
 
     if (!project.budget || parseFloat(project.budget) <= 0) {
       newErrors.budget = 'Le budget doit être supérieur à 0';
+    }
+
+    if (!project.currency) {
+      newErrors.currency = 'La devise est requise';
+    }
+
+    if (!project.exchange_rate || parseFloat(project.exchange_rate) <= 0) {
+      newErrors.exchange_rate = 'Le taux de conversion doit être supérieur à 0';
+    }
+
+    if (!project.started_at) {
+      newErrors.started_at = 'La date de début est requise';
+    }
+
+    if (project.started_at && project.achieved_at) {
+      const startDate = new Date(project.started_at);
+      const endDate = new Date(project.achieved_at);
+      if (startDate > endDate) {
+        newErrors.dates = 'La date de début doit être antérieure à la date de fin';
+      }
     }
 
     setErrors(newErrors);
@@ -56,9 +83,32 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
     }
 
     try {
-      onSubmit(project);
+      // S'assurer que toutes les données requises sont présentes
+      const projectData = {
+        ...project,
+        budget: project.budget.toString(),
+        started_at: project.started_at,
+        achieved_at: project.achieved_at,
+        currency: project.currency,
+        exchange_rate: project.exchange_rate,
+        managed_by: 1
+      };
+
+      onSubmit(projectData);
     } catch (error) {
       toast.error("Erreur lors de la création du projet");
+    }
+  };
+
+  const handleCurrencyChange = (currencyCode: string) => {
+    const selectedCurrency = CURRENCIES.find(c => c.code === currencyCode);
+    if (selectedCurrency) {
+      setProject({
+        ...project,
+        currency: currencyCode,
+        exchange_rate: selectedCurrency.rate
+      });
+      setErrors({ ...errors, currency: '', exchange_rate: '' });
     }
   };
 
@@ -112,28 +162,133 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
             />
           </div>
 
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Budget <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="number"
+                value={project.budget}
+                onChange={(e) => {
+                  setProject({ ...project, budget: e.target.value });
+                  setErrors({ ...errors, budget: '' });
+                }}
+                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${
+                  errors.budget ? 'border-red-500' : 'border-gray-300'
+                }`}
+                min="0"
+                step="0.01"
+                placeholder="Budget du projet"
+              />
+              {errors.budget && (
+                <p className="mt-1 text-sm text-red-500">{errors.budget}</p>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Devise <span className="text-red-500">*</span>
+              </label>
+              <select
+                value={project.currency}
+                onChange={(e) => handleCurrencyChange(e.target.value)}
+                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${
+                  errors.currency ? 'border-red-500' : 'border-gray-300'
+                }`}
+              >
+                {CURRENCIES.map(({ code, label }) => (
+                  <option key={code} value={code}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+              {errors.currency && (
+                <p className="mt-1 text-sm text-red-500">{errors.currency}</p>
+              )}
+            </div>
+          </div>
+
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Budget <span className="text-red-500">*</span>
+              Taux de conversion (FCFA/Devise) <span className="text-red-500">*</span>
             </label>
-            <input
-              type="number"
-              value={project.budget}
-              onChange={(e) => {
-                setProject({ ...project, budget: e.target.value });
-                setErrors({ ...errors, budget: '' });
-              }}
-              className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${
-                errors.budget ? 'border-red-500' : 'border-gray-300'
-              }`}
-              min="0"
-              step="0.01"
-              placeholder="Budget du projet"
-            />
-            {errors.budget && (
-              <p className="mt-1 text-sm text-red-500">{errors.budget}</p>
+            <div className="relative">
+              <input
+                type="number"
+                value={project.exchange_rate}
+                onChange={(e) => {
+                  setProject({ ...project, exchange_rate: e.target.value });
+                  setErrors({ ...errors, exchange_rate: '' });
+                }}
+                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${
+                  errors.exchange_rate ? 'border-red-500' : 'border-gray-300'
+                }`}
+                min="0.000001"
+                step="0.000001"
+                placeholder="Taux de conversion"
+              />
+              <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                <span className="text-gray-500">FCFA</span>
+              </div>
+            </div>
+            {errors.exchange_rate && (
+              <p className="mt-1 text-sm text-red-500">{errors.exchange_rate}</p>
             )}
+            <p className="mt-1 text-sm text-gray-500">
+              1 {project.currency} = {project.exchange_rate} FCFA
+            </p>
           </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Date de début <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="date"
+                value={project.started_at ? project.started_at.slice(0, 10) : ''}
+                onChange={(e) => {
+                  const newDate = e.target.value;
+                  // Vérifiez que la date modifiée est valide avant de la stocker
+                  setProject({
+                    ...project,
+                    started_at: newDate ? new Date(newDate).toISOString() : '', // Si une date valide est sélectionnée, on la transforme en ISO, sinon on vide le champ
+                  });
+                  setErrors({ ...errors, dates: '' });
+                }}
+                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${ errors.dates ? 'border-red-500' : 'border-gray-300'
+                }`}
+              />
+              {errors.started_at && (
+                <p className="mt-1 text-sm text-red-500">{errors.started_at}</p>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Date de fin
+              </label>
+              <input
+                type="date"
+                value={project.achieved_at ? project.achieved_at.slice(0, 10) : ''} // Si la date est définie, on l'affiche, sinon on met une chaîne vide
+                onChange={(e) => {
+                  const newDate = e.target.value;
+                  // Vérifiez que la date modifiée est valide avant de la stocker
+                  setProject({
+                    ...project,
+                    achieved_at: newDate ? new Date(newDate).toISOString() : '', // Si une date valide est sélectionnée, on la transforme en ISO, sinon on vide le champ
+                  });
+                  setErrors({ ...errors, dates: '' });
+                }}
+                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${errors.dates ? 'border-red-500' : 'border-gray-300'}`}
+              />
+
+            </div>
+          </div>
+          {errors.dates && (
+            <p className="mt-1 text-sm text-red-500">{errors.dates}</p>
+          )}
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">

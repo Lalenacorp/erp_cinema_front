@@ -44,9 +44,26 @@ export const projectService = {
 
   async createProject(projectData: CreateProjectRequest): Promise<Project> {
     try {
-      const { data } = await api.post<Project>('/create_project/', projectData);
+      // Format dates to YYYY-MM-DD
+      const formattedData = {
+        ...projectData,
+        started_at: projectData.started_at,
+        achieved_at: projectData.achieved_at,
+      };
+
+      // Log formatted data for debugging
+      console.log("📌 Données envoyées à l'API :", JSON.stringify(formattedData, null, 2));
+
+      const { data } = await api.post<Project>('/create_project/', formattedData);
+      console.log('Réponse du serveur:', data);
+      
       return data;
-    } catch (error) {
+    } catch (error: any) {
+      console.error('Erreur détaillée:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status
+      });
       return handleError(error, "Impossible de créer le projet");
     }
   },
@@ -62,7 +79,14 @@ export const projectService = {
 
   async updateProject(id: number, updatedData: UpdateProjectRequest): Promise<Project> {
     try {
-      const { data } = await api.patch<Project>(`/update_project/${id}/`, updatedData);
+      // Format dates if present
+      const formattedData = {
+        ...updatedData,
+        started_at: updatedData.started_at?.split('T')[0],
+        achieved_at: updatedData.achieved_at?.split('T')[0]
+      };
+
+      const { data } = await api.patch<Project>(`/update_project/${id}/`, formattedData);
       return data;
     } catch (error) {
       return handleError(error, "Impossible de mettre à jour le projet");
