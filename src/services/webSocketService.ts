@@ -129,7 +129,7 @@ export class WebSocketService {
       this.pingTimeout = null;
     }
   }
-
+/* 
   private async refreshTokenAndReconnect() {
     try {
       const newTokens = await authService.refreshAccessToken();
@@ -146,7 +146,7 @@ export class WebSocketService {
       console.error('Erreur de rafraîchissement du token:', error);
       authService.logout();
     }
-  }
+  } */
 
   private attemptReconnect() {
     if (this.reconnectAttempts < this.maxReconnectAttempts) {
@@ -211,15 +211,8 @@ export class WebSocketService {
     return this.socket?.readyState ?? WebSocket.CLOSED;
   }
 
-  updateExpense(subactivityId: number, amountSpent: number, name: string): boolean {
-    return this.send({
-      action: 'update_expense',
-      subactivity_id: subactivityId,
-      amount_spent: amountSpent,
-      name: name
-    });
-  }
 
+  
   deleteExpense(expenseId: number): boolean {
     return this.send({
       action: 'delete_expense',

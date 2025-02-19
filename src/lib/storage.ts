@@ -53,7 +53,7 @@ const defaultData: StorageData = {
   permissions: []
 };
 
-export const storage = {
+/* export const storage = {
   getData(): StorageData {
     const data = localStorage.getItem(STORAGE_KEY);
     if (!data) {
@@ -76,4 +76,4 @@ export const storage = {
   clearData(): void {
     localStorage.removeItem(STORAGE_KEY);
   }
-};
+}; */

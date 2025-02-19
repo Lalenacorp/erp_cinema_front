@@ -21,8 +21,7 @@ const NewSubActivityModal: React.FC<NewSubActivityModalProps> = ({
     name: '',
     description: '',
     amount_estimated: '',
-    dateDebut: '',
-    dateFin: ''
+  
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -38,14 +37,7 @@ const NewSubActivityModal: React.FC<NewSubActivityModalProps> = ({
       newErrors.amount_estimated = 'Le montant estimé doit être supérieur à 0';
     }
 
-    if (formData.dateDebut && formData.dateFin) {
-      const startDate = new Date(formData.dateDebut);
-      const endDate = new Date(formData.dateFin);
-      
-      if (startDate > endDate) {
-        newErrors.dates = 'La date de début doit être antérieure à la date de fin';
-      }
-    }
+   
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -75,8 +67,7 @@ const NewSubActivityModal: React.FC<NewSubActivityModalProps> = ({
         name: '',
         description: '',
         amount_estimated: '',
-        dateDebut: '',
-        dateFin: ''
+       
       });
       onClose();
       
@@ -158,44 +149,6 @@ const NewSubActivityModal: React.FC<NewSubActivityModalProps> = ({
               <p className="mt-1 text-sm text-red-500">{errors.amount_estimated}</p>
             )}
           </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Date de début
-              </label>
-              <input
-                type="date"
-                value={formData.dateDebut}
-                onChange={(e) => {
-                  setFormData({ ...formData, dateDebut: e.target.value });
-                  setErrors({ ...errors, dates: '' });
-                }}
-                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${
-                  errors.dates ? 'border-red-500' : 'border-gray-300'
-                }`}
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Date de fin
-              </label>
-              <input
-                type="date"
-                value={formData.dateFin}
-                onChange={(e) => {
-                  setFormData({ ...formData, dateFin: e.target.value });
-                  setErrors({ ...errors, dates: '' });
-                }}
-                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${
-                  errors.dates ? 'border-red-500' : 'border-gray-300'
-                }`}
-              />
-            </div>
-          </div>
-          {errors.dates && (
-            <p className="mt-1 text-sm text-red-500">{errors.dates}</p>
-          )}
 
           <button
             type="submit"

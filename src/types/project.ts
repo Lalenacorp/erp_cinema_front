@@ -22,18 +22,21 @@ export interface Project {
 
 export interface CreateProjectRequest {
   name: string;
+  description: string | null;
+  status?: ProjectStatus;
   budget: string;
-  status: ProjectStatus;
-  managed_by: number;
   currency: string;
   exchange_rate: string;
-  started_at: Date;
-  achieved_at: Date;
+  managed_by: number;
+  activites: Activity[];
+  started_at: string; // date de début
+  achieved_at: string; // date de fin
 }
 
 export interface UpdateProjectRequest {
   name?: string;
   description?: string;
+  budget: string;
   status?: ProjectStatus;
   currency?: string;
   exchange_rate?: string;

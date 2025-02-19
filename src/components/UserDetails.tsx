@@ -46,6 +46,7 @@ const UserDetails: React.FC<UserDetailsProps> = ({
     try {
       setIsLoading(true);
       const fetchedUser = await authService.getUserById(userId);
+      console.log('Données de l\'utilisateur récupérées : ', fetchedUser);
       setUser(fetchedUser);
       setError(null);
     } catch (err: any) {
@@ -168,12 +169,6 @@ const UserDetails: React.FC<UserDetailsProps> = ({
             ) : (
               <>
                 <div className="space-y-6">
-                  {/* User ID Section */}
-                  <div className="bg-gray-50 p-4 rounded-xl">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">ID</label>
-                    <p className="text-gray-900 font-mono">{user.id}</p>
-                  </div>
-
                   {/* Main Info Section */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     {/* Username Field */}
@@ -260,14 +255,14 @@ const UserDetails: React.FC<UserDetailsProps> = ({
                         <Users className="h-4 w-4 text-gray-400" />
                         Groupes
                       </label>
-                      {user.groups && user.groups.length > 0 ? (
+                      {Array.isArray(user.groups) && user.groups.length > 0 ? (
                         <div className="flex flex-wrap gap-2">
-                          {user.groups.map((group: Group) => (
+                          {user.groups.map((group, index) => (
                             <span
-                              key={group.id}
+                              key={index}
                               className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium bg-blue-50 text-blue-700"
                             >
-                              {group.name}
+                              {typeof group === 'string' ? group : group.name}
                             </span>
                           ))}
                         </div>

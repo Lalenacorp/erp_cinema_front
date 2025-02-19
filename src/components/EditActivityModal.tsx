@@ -4,7 +4,7 @@ import type { Activity } from '../types';
 import toast from 'react-hot-toast';
 
 interface EditActivityModalProps {
-  isOpen: boolean;
+  isOpen: boolean;   
   onClose: () => void;
   activity: Activity;
   onSubmit: (updatedActivity: Activity) => void;

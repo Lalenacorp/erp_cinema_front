@@ -17,7 +17,7 @@ const Sidebar = () => {
     { icon: <LayoutDashboard className="w-5 h-5" />, label: 'Tableau de bord', path: '/' },
     { icon: <Film className="w-5 h-5" />, label: 'Projets', path: '/projets' },
     { icon: <Activity className="w-5 h-5" />, label: 'Activités', path: '/activites' },
-    { icon: <Users className="w-5 h-5" />, label: 'Équipe', path: '/equipe' },
+   // { icon: <Users className="w-5 h-5" />, label: 'Équipe', path: '/equipe' },
     { icon: <Receipt className="w-5 h-5" />, label: 'Dépenses', path: '/depenses' },
     { icon: <FileText className="w-5 h-5" />, label: 'Rapports', path: '/rapports' },
     { icon: <UserCog className="w-5 h-5" />, label: 'Utilisateurs', path: '/utilisateurs' },

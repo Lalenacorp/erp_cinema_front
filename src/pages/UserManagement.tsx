@@ -5,6 +5,7 @@ import type { User, Group } from '../types/auth';
 import UserGroupsModal from '../components/UserGroupsModal';
 import InviteUserModal from '../components/InviteUserModal';
 import UserDetails from '../components/UserDetails';
+import toast from 'react-hot-toast';
 
 function UserManagement() {
   const [users, setUsers] = useState<User[]>([]);
@@ -26,6 +27,7 @@ function UserManagement() {
     } catch (error) {
       console.error('Erreur lors du chargement des utilisateurs:', error);
       setUsers([]);
+      toast.error('Erreur lors du chargement des utilisateurs');
     } finally {
       setIsLoading(false);
     }
@@ -46,21 +48,24 @@ function UserManagement() {
         email,
         password,
       });
-      alert(`Invitation envoyée avec succès à ${email}`);
+      toast.success(`Invitation envoyée avec succès à ${email}`);
       await loadUsers();
     } catch (error) {
       console.error('Erreur lors de l\'invitation de l\'utilisateur:', error);
-      alert('Échec de l\'invitation. Vérifiez les informations.');
+      toast.error('Échec de l\'invitation. Vérifiez les informations.');
     }
   };
 
   const handleUpdateUserGroups = async (userId: string, groupId: string[]) => {
     try {
       await authService.assignUserGroups({ userId, groupId });
-      loadUsers();
+      await loadUsers();
+      toast.success('Groupes mis à jour avec succès');
+      setIsUserGroupsModalOpen(false);
+      setSelectedUser(null);
     } catch (error) {
       console.error('Erreur lors de la mise à jour des groupes de l\'utilisateur:', error);
-      alert("Erreur lors de la mise à jour des groupes");
+      toast.error("Erreur lors de la mise à jour des groupes");
     }
   };
 
@@ -72,10 +77,12 @@ function UserManagement() {
   const handleUserDeleted = () => {
     loadUsers();
     setIsUserDetailsModalOpen(false);
+    toast.success('Utilisateur supprimé avec succès');
   };
 
   const handleUserUpdated = () => {
     loadUsers();
+    toast.success('Utilisateur mis à jour avec succès');
   };
 
   return (

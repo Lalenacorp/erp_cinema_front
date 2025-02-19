@@ -1,13 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { 
-  DollarSign, 
   Calendar, 
   Clock, 
   Users,
   Plus,
   Pencil,
-  Trash2
+  Trash2,
+  Banknote
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { apiService } from '../services/apiService';
@@ -17,6 +17,17 @@ import NewActivityModal from '../components/NewActivityModal';
 import EditProjectModal from '../components/EditProjectModal';
 import DeleteProjectModal from '../components/DeleteProjectModal';
 
+export interface UpdateProjectRequest {
+  name?: string;
+  description?: string;
+  budget: string;
+  status?: ProjectStatus;
+  currency?: string;
+  exchange_rate?: string;
+  started_at?: string;
+  achieved_at?: string;
+}
+export type ProjectStatus = "prepa" | "pre-prod" | "prod" | "post-prod";
 // Helper components for better organization
 const StatCard = ({ 
   icon: Icon, 
@@ -53,6 +64,7 @@ function ProjectDetails() {
   const [activities, setActivities] = useState<Activity[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [lastUpdate, setLastUpdate] = useState<number>(Date.now());
   
   // Modal states
   const [isNewActivityModalOpen, setIsNewActivityModalOpen] = useState(false);
@@ -60,13 +72,7 @@ function ProjectDetails() {
   const [isDeleteProjectModalOpen, setIsDeleteProjectModalOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  useEffect(() => {
-    if (id) {
-      loadProjectData();
-    }
-  }, [id]);
-
-  const loadProjectData = async () => {
+  const loadProjectData = useCallback(async () => {
     if (!id) return;
     setIsLoading(true);
     setError(null);
@@ -92,6 +98,17 @@ function ProjectDetails() {
     } finally {
       setIsLoading(false);
     }
+  }, [id]);
+
+  useEffect(() => {
+    if (id) {
+      loadProjectData();
+    }
+  }, [id, lastUpdate, loadProjectData]);
+
+  const refreshData = () => {
+    console.log("Rafraîchissement des données...");
+    setLastUpdate(Date.now());
   };
 
   const formatDate = (date: string | undefined | null) => {
@@ -118,7 +135,7 @@ function ProjectDetails() {
         newActivity.managed_by
       );
       
-      await loadProjectData();
+      refreshData();
       setIsNewActivityModalOpen(false);
       toast.success('Activité ajoutée avec succès');
     } catch (err) {
@@ -135,7 +152,7 @@ function ProjectDetails() {
         name: updatedActivity.name,
         description: updatedActivity.description || null
       });
-      await loadProjectData();
+      refreshData();
       toast.success('Activité mise à jour avec succès');
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Erreur lors de la mise à jour de l'activité";
@@ -148,7 +165,7 @@ function ProjectDetails() {
     
     try {
       await apiService.deleteActivity(activityId);
-      await loadProjectData();
+      refreshData();
       toast.success('Activité supprimée avec succès');
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Erreur lors de la suppression de l'activité";
@@ -156,17 +173,25 @@ function ProjectDetails() {
     }
   };
 
-  const handleProjectUpdate = async (updatedProject: Project) => {
+const handleProjectUpdate = async (updatedProject: Project) => {
+    console.log("🔍 handleProjectUpdate exécuté avec :", updatedProject);
+
     try {
       await apiService.updateProject(project!.id, updatedProject);
-      await loadProjectData();
+      
+      console.log("✅ Projet mis à jour, rechargement des données...");
+      await loadProjectData(); // Utiliser directement loadProjectData au lieu de refreshData
+
       setIsEditProjectModalOpen(false);
       toast.success('Projet mis à jour avec succès');
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Erreur lors de la mise à jour du projet";
+      console.error("❌ Erreur de mise à jour:", errorMessage);
       toast.error(errorMessage);
     }
   };
+
+
 
   const handleDeleteProject = async () => {
     if (!project) return;
@@ -238,35 +263,33 @@ function ProjectDetails() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mt-6">
-            
-          <StatCard
-  icon={DollarSign}
-  title="Budget total"
-  value={`${project.budget} ${project.currency}`}
-  bgColor="bg-blue-50"
-  iconColor="bg-blue-100 text-blue-600"
->
-  <div className="mt-2 space-y-2">
-    <div className="flex justify-between text-sm">
-      <span className="text-gray-600">Dépensé :</span>
-      <span className="font-medium">
-        {project.current_expenses || '0'} {project.currency}
-      </span>
-    </div>
-    <div className="flex justify-between text-sm">
-      <span className="text-gray-600">Écart :</span>
-      <span className={`font-medium ${Number(project.budget_gap) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-        {project.budget_gap || '0'} {project.currency}
-      </span>
-    </div>
-  </div>
-</StatCard>
-
+            <StatCard
+              icon={Banknote}
+              title="Budget total"
+              value={`${project.budget} ${project.currency}`}
+              bgColor="bg-blue-50"
+              iconColor="bg-blue-100 text-blue-600"
+            >
+              <div className="mt-2 space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-600">Dépensé :</span>
+                  <span className="font-medium">
+                    {project.current_expenses || '0'} {project.currency}
+                  </span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-600">Écart :</span>
+                  <span className={`font-medium ${Number(project.budget_gap) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    {project.budget_gap || '0'} {project.currency}
+                  </span>
+                </div>
+              </div>
+            </StatCard>
 
             <StatCard
               icon={Calendar}
               title="Date de début"
-              value={formatDate(project.dateDebut)}
+              value={formatDate(project.started_at)}
               bgColor="bg-green-50"
               iconColor="bg-green-100 text-green-600"
             />

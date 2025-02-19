@@ -6,6 +6,7 @@ export interface Expense {
   updated_at: string;
   subactivity: number;
   created_by: number;
+  proof_payment: File 
 }
 
 export interface ExpenseUpdateResponse {
@@ -21,4 +22,5 @@ export interface ExpenseUpdateResponse {
   subactivity_amount_estimated: string;
   subactivity_amount_spent: string;
   subactivity_gap: string;
+  proof_payment_url: string;
 }

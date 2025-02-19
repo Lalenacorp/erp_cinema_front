@@ -1,13 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Search, Filter } from 'lucide-react';
+import { Plus, Filter } from 'lucide-react';
 import { projectService } from '../services/projectService';
-import { expenseService } from '../services/expenseService';
+import { authService } from '../services/authService';
 import type { Project } from '../types';
-import type { Expense, ExpenseUpdateResponse } from '../types/expense';
+import type { ExpenseUpdateResponse, Expense } from '../types/expense';
 import { ExpenseList } from '../components/ExpenseList';
 import NewExpenseModal from '../components/NewExpenseModal';
 import toast from 'react-hot-toast';
-import { authService } from '../services/authService';
 
 function Depenses() {
   const [projects, setProjects] = useState<Project[]>([]);
@@ -15,9 +14,9 @@ function Depenses() {
   const [isNewExpenseModalOpen, setIsNewExpenseModalOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [expenses, setExpenses] = useState<Expense[]>([]);
 
   useEffect(() => {
-    // Vérifier l'authentification avant de charger les données
     const checkAuthAndLoadData = async () => {
       try {
         const token = authService.getToken();
@@ -52,10 +51,14 @@ function Depenses() {
   };
 
   const handleExpenseUpdate = (data: ExpenseUpdateResponse) => {
-    // Mettre à jour l'interface utilisateur avec les nouvelles données
     console.log('Mise à jour des dépenses:', data);
-    loadProjects(); // Recharger les projets pour avoir les montants à jour
+    loadProjects(); 
   };
+
+  // Trier les dépenses par `created_at` (du plus récent au plus ancien)
+  const sortedExpenses = expenses.sort((a, b) => {
+    return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+  });
 
   if (isLoading) {
     return (
@@ -82,8 +85,8 @@ function Depenses() {
         </div>
         <button
           onClick={() => setIsNewExpenseModalOpen(true)}
-          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors"
-          disabled={!selectedProject}
+          className={`bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors`}
+          title={'Ajouter une dépense'}
         >
           <Plus className="w-5 h-5" />
           Nouvelle dépense
@@ -113,6 +116,7 @@ function Depenses() {
             <ExpenseList
               projectId={selectedProject}
               onExpenseUpdate={handleExpenseUpdate}
+              expenses={sortedExpenses}  
             />
           ) : (
             <div className="text-center py-12">

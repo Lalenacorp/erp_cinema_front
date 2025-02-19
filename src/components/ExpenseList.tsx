@@ -15,6 +15,7 @@ import { useWebSocket } from '../hooks/useWebSocket';
 interface ExpenseListProps {
   projectId: string;
   onExpenseUpdate: (data: ExpenseUpdateResponse) => void;
+  expenses: Expense[]; 
 }
 
 interface ExpenseWithDetails extends Expense {

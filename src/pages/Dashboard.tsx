@@ -41,22 +41,50 @@ function Dashboard() {
 
   // Calculs des statistiques globales
   const totalProjects = projects.length;
-  const activeProjects = projects.filter(p => p.status === 'prod').length;
   const totalBudget = projects.reduce((sum, p) => sum + parseFloat(p.budget), 0);
   const totalExpenses = projects.reduce((sum, p) => sum + (p.current_expenses ? parseFloat(p.current_expenses) : 0), 0);
   const budgetUtilization = totalBudget > 0 ? (totalExpenses / totalBudget) * 100 : 0;
 
   // Calcul des projets avec échéances proches (7 jours)
-  const upcomingDeadlines = projects.filter(p => {
-    if (!p.dateDebut) return false;
-    const daysUntilStart = Math.ceil((new Date(p.dateDebut).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
-    return daysUntilStart > 0 && daysUntilStart <= 7;
-  }).length;
+  const today = new Date();
+  const upcomingProjects = projects.filter(project => {
+    if (!project.started_at || !project.achieved_at) return false;
+
+    const startDate = new Date(project.started_at);
+    const endDate = new Date(project.achieved_at);
+    const daysUntilStart = Math.ceil((startDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+    const daysUntilEnd = Math.ceil((endDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+
+    // Projet qui commence ou se termine dans les 7 prochains jours
+    return (daysUntilStart >= 0 && daysUntilStart <= 7) || (daysUntilEnd >= 0 && daysUntilEnd <= 7);
+  });
+
+  const upcomingDeadlines = upcomingProjects.length;
+
+  // Détails des échéances
+  const upcomingDetails = upcomingProjects.map(project => {
+    const startDate = new Date(project.started_at);
+    const endDate = new Date(project.achieved_at);
+    const daysUntilStart = Math.ceil((startDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+    const daysUntilEnd = Math.ceil((endDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+
+    return {
+      name: project.name,
+      isStarting: daysUntilStart >= 0 && daysUntilStart <= 7,
+      isEnding: daysUntilEnd >= 0 && daysUntilEnd <= 7,
+      daysUntilStart,
+      daysUntilEnd
+    };
+  });
 
   // Calcul de la durée moyenne des projets (en mois)
   const averageProjectDuration = projects.length > 0 
     ? projects.reduce((total, project) => {
-        const duration = Math.ceil((new Date().getTime() - new Date(project.dateDebut).getTime()) / (1000 * 60 * 60 * 24 * 30));
+        if (!project.started_at || !project.achieved_at) return total;
+        const duration = Math.ceil(
+          (new Date(project.achieved_at).getTime() - new Date(project.started_at).getTime()) 
+          / (1000 * 60 * 60 * 24 * 30)
+        );
         return total + duration;
       }, 0) / projects.length
     : 0;
@@ -138,11 +166,11 @@ function Dashboard() {
               <Film className="w-6 h-6 text-blue-600" />
             </div>
           </div>
-          <h3 className="text-gray-500 text-sm font-medium">Projets actifs</h3>
+          <h3 className="text-gray-500 text-sm font-medium">Total des projets</h3>
           <div className="flex items-end justify-between mt-1">
-            <p className="text-2xl font-semibold">{activeProjects}/{totalProjects}</p>
-            <p className="text-sm font-medium">
-              <span className="text-blue-600">{formatPercentage(activeProjects/totalProjects)}</span>
+            <p className="text-2xl font-semibold">{totalProjects}</p>
+            <p className="text-sm font-medium text-blue-600">
+              Tous les projets
             </p>
           </div>
         </div>
@@ -154,13 +182,19 @@ function Dashboard() {
             </div>
           </div>
           <h3 className="text-gray-500 text-sm font-medium">Budget total</h3>
-          <div className="flex items-end justify-between mt-1">
-            <p className="text-2xl font-semibold">{formatCurrency(totalBudget)}</p>
-            <p className="text-sm font-medium">
-              <span className={budgetUtilization > 90 ? 'text-red-600' : 'text-green-600'}>
-                {formatPercentage(budgetUtilization)} utilisé
-              </span>
-            </p>
+          <div className="flex flex-col mt-1">
+            <div className="flex items-end justify-between">
+              <p className="text-2xl font-semibold">{formatCurrency(totalBudget)}</p>
+              <p className="text-sm font-medium">
+                <span className={budgetUtilization > 90 ? 'text-red-600' : 'text-green-600'}>
+                  {formatPercentage(budgetUtilization)} utilisé
+                </span>
+              </p>
+            </div>
+            <div className="flex items-center justify-between mt-2">
+              <p className="text-sm text-gray-500">Dépensé :</p>
+              <p className="text-sm font-medium text-gray-900">{formatCurrency(totalExpenses)}</p>
+            </div>
           </div>
         </div>
 
@@ -173,8 +207,21 @@ function Dashboard() {
           <h3 className="text-gray-500 text-sm font-medium">Échéances proches</h3>
           <div className="flex items-end justify-between mt-1">
             <p className="text-2xl font-semibold">{upcomingDeadlines}</p>
-            <p className="text-purple-600 text-sm font-medium">Cette semaine</p>
+            <p className="text-purple-600 text-sm font-medium">
+              Dans les 7 jours
+            </p>
           </div>
+          {upcomingDeadlines > 0 && (
+            <div className="mt-2 space-y-1">
+              {upcomingDetails.map((project, index) => (
+                <p key={index} className="text-sm text-gray-600">
+                  {project.name} - {project.isStarting 
+                    ? `Début dans ${project.daysUntilStart}j` 
+                    : `Fin dans ${project.daysUntilEnd}j`}
+                </p>
+              ))}
+            </div>
+          )}
         </div>
 
         <div className="bg-white rounded-xl p-6 shadow-sm">

@@ -1,12 +1,20 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 import type { Project, ProjectStatus } from '../types';
 import toast from 'react-hot-toast';
+import { projectService } from '../services/projectService'; 
+import { authService} from '../services/authService';
+import {User} from '../types/auth'
+
 
 interface NewProjectModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSubmit: (project: Omit<Project, "id">) => void;
+}
+
+interface ApiResponse {
+  data: User[];
 }
 
 const NewProjectModal: React.FC<NewProjectModalProps> = ({
@@ -16,7 +24,7 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
 }) => {
   const [project, setProject] = useState<Omit<Project, "id">>({
     name: '',
-    description: null,
+    description: '',
     budget: '0',
     status: 'prepa',
     managed_by: 1,
@@ -24,18 +32,21 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
     updated_at: new Date().toISOString(),
     current_expenses: null,
     budget_gap: null,
-    currency: 'FCFA',
-    exchange_rate: '650',
+    currency: '',
+    exchange_rate: '',
     activites: [],
-    started_at: new Date().toISOString(),
-    achieved_at: new Date().toISOString()
+    started_at: '',
+    achieved_at: ''
   });
+
 
   const CURRENCIES = [
     { code: 'FCFA', label: 'FCFA', rate: '650' },
     { code: 'Euro', label: 'Euro (€)', rate: '1' },
-    { code: 'Dollar', label: 'Dollar ($)', rate: '600' }
+    { code: 'Dollars', label: 'Dollar ($)', rate: '600' }
   ];
+
+  const [users, setUsers] = useState<any[]>([]);
 
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -74,18 +85,20 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
+    console.log("Données du formulaire avant envoi:", project);
+  
     if (!validateForm()) {
       toast.error('Veuillez corriger les erreurs avant de continuer');
       return;
     }
-
+  
     try {
-      // S'assurer que toutes les données requises sont présentes
       const projectData = {
         ...project,
+        name: project.name,
+        description: project.description,
         budget: project.budget.toString(),
         started_at: project.started_at,
         achieved_at: project.achieved_at,
@@ -93,13 +106,19 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
         exchange_rate: project.exchange_rate,
         managed_by: 1
       };
-
-      onSubmit(projectData);
+  
+      // Appel de la fonction createProject depuis projectService
+      const response = await projectService.createProject(projectData); // Notez l'utilisation de projectService ici
+      console.log("Réponse de l'API:", response);
+      toast.success("Projet créé avec succès!");
+      onClose();
     } catch (error) {
       toast.error("Erreur lors de la création du projet");
+      console.error("Erreur:", error);
     }
   };
-
+  
+  
   const handleCurrencyChange = (currencyCode: string) => {
     const selectedCurrency = CURRENCIES.find(c => c.code === currencyCode);
     if (selectedCurrency) {
@@ -111,6 +130,22 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
       setErrors({ ...errors, currency: '', exchange_rate: '' });
     }
   };
+
+  useEffect(() => {
+    const fetchUsers = async () => {
+      try {
+        const response = await authService.getAllUsers();
+        setUsers(response); // Directement assigner le tableau
+      } catch (error) {
+        console.error("Erreur lors du chargement des utilisateurs", error);
+      }
+    };
+  
+    fetchUsers();
+  }, []);
+  
+  
+  
 
   if (!isOpen) return null;
 
@@ -162,6 +197,31 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
             />
           </div>
 
+          <div>
+  <label className="block text-sm font-medium text-gray-700 mb-1">
+    Géré par <span className="text-red-500">*</span>
+  </label>
+  <select
+    value={project.managed_by}
+    onChange={(e) => setProject({ ...project, managed_by: Number(e.target.value) })}
+    className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${
+      errors.managed_by ? 'border-red-500' : 'border-gray-300'
+    }`}
+  >
+    <option value="">Sélectionner un utilisateur</option>
+    {users.map((user) => (
+      <option key={user.id} value={user.id}>
+        {user.first_name} {user.last_name} {/* Utilisez first_name et last_name */}
+      </option>
+    ))}
+  </select>
+  {errors.managed_by && (
+    <p className="mt-1 text-sm text-red-500">{errors.managed_by}</p>
+  )}
+</div>
+
+
+
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -208,7 +268,8 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
               )}
             </div>
           </div>
-
+          
+          <div className="grid grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Taux de conversion (FCFA/Devise) <span className="text-red-500">*</span>
@@ -239,57 +300,6 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
               1 {project.currency} = {project.exchange_rate} FCFA
             </p>
           </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Date de début <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="date"
-                value={project.started_at ? project.started_at.slice(0, 10) : ''}
-                onChange={(e) => {
-                  const newDate = e.target.value;
-                  // Vérifiez que la date modifiée est valide avant de la stocker
-                  setProject({
-                    ...project,
-                    started_at: newDate ? new Date(newDate).toISOString() : '', // Si une date valide est sélectionnée, on la transforme en ISO, sinon on vide le champ
-                  });
-                  setErrors({ ...errors, dates: '' });
-                }}
-                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${ errors.dates ? 'border-red-500' : 'border-gray-300'
-                }`}
-              />
-              {errors.started_at && (
-                <p className="mt-1 text-sm text-red-500">{errors.started_at}</p>
-              )}
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Date de fin
-              </label>
-              <input
-                type="date"
-                value={project.achieved_at ? project.achieved_at.slice(0, 10) : ''} // Si la date est définie, on l'affiche, sinon on met une chaîne vide
-                onChange={(e) => {
-                  const newDate = e.target.value;
-                  // Vérifiez que la date modifiée est valide avant de la stocker
-                  setProject({
-                    ...project,
-                    achieved_at: newDate ? new Date(newDate).toISOString() : '', // Si une date valide est sélectionnée, on la transforme en ISO, sinon on vide le champ
-                  });
-                  setErrors({ ...errors, dates: '' });
-                }}
-                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${errors.dates ? 'border-red-500' : 'border-gray-300'}`}
-              />
-
-            </div>
-          </div>
-          {errors.dates && (
-            <p className="mt-1 text-sm text-red-500">{errors.dates}</p>
-          )}
-
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Statut
@@ -305,16 +315,70 @@ const NewProjectModal: React.FC<NewProjectModalProps> = ({
               <option value="post-prod">Post-production</option>
             </select>
           </div>
+          </div>
 
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Date de début <span className="text-red-500">*</span>
+              </label>
+              <input
+          type="date"
+          value={project.started_at}
+          onChange={(e) => {
+            const newDate = e.target.value; // This will be in YYYY-MM-DD format
+            setProject({
+              ...project,
+              started_at: newDate
+            });
+            setErrors({ ...errors, dates: '' });
+          }}
+          className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${
+            errors.dates ? 'border-red-500' : 'border-gray-300'
+          }`}
+        />
+        {errors.started_at && (
+          <p className="mt-1 text-sm text-red-500">{errors.started_at}</p>
+        )}
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Date de fin
+              </label>
+              <input
+          type="date"
+          value={project.achieved_at}
+          onChange={(e) => {
+            const newDate = e.target.value; // This will be in YYYY-MM-DD format
+            setProject({
+              ...project,
+              achieved_at: newDate
+            });
+            setErrors({ ...errors, dates: '' });
+          }}
+          className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${
+            errors.dates ? 'border-red-500' : 'border-gray-300'
+          }`}
+        />
+        {errors.achieved_at && (
+          <p className="mt-1 text-sm text-red-500">{errors.achieved_at}</p>
+        )}
+          </div>
+         
+          </div>
           <button
             type="submit"
             className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
           >
             Créer le projet
           </button>
+          
+       
         </form>
       </div>
     </div>
+  
   );
 };
 

@@ -44,16 +44,27 @@ export const projectService = {
 
   async createProject(projectData: CreateProjectRequest): Promise<Project> {
     try {
-      // Format dates to YYYY-MM-DD
+
+      console.log("Données reçues dans le service:", projectData);
+      
+      // Créer une copie complète des données du projet
       const formattedData = {
-        ...projectData,
+        name: projectData.name,
+        description: projectData.description,
+        budget: projectData.budget,
+        currency: projectData.currency,
+        exchange_rate: projectData.exchange_rate,
+        status: projectData.status,
+        managed_by: projectData.managed_by,
         started_at: projectData.started_at,
         achieved_at: projectData.achieved_at,
+       
+        // Ajoutez tous les autres champs nécessaires ici
       };
-
-      // Log formatted data for debugging
+  
+      // Log des données pour le débogage
       console.log("📌 Données envoyées à l'API :", JSON.stringify(formattedData, null, 2));
-
+  
       const { data } = await api.post<Project>('/create_project/', formattedData);
       console.log('Réponse du serveur:', data);
       

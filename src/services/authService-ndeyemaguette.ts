@@ -2,10 +2,6 @@ import { api } from '../lib/api';
 import type { User, AuthTokens, LoginRequest, Group, Permission,  ResetPasswordResponse } from '../types/auth';
 import { jwtDecode } from 'jwt-decode';  
 
-interface AssignGroupsRequest {
-  userId: string;
-  groupId: string[];
-}
 
 export const authService = {
   
@@ -426,7 +422,7 @@ async deleteUser(userId: string): Promise<void> {
 
 
 // Mettre à jour les groupes d'un utilisateur
-async assignUserGroups({ userId, groupId }: AssignGroupsRequest): Promise<void> {
+async assignUserGroups({ userId, groupId }: { userId: string; groupId: string[] }): Promise<void> {
   try {
     const token = this.getToken();
     
@@ -434,49 +430,45 @@ async assignUserGroups({ userId, groupId }: AssignGroupsRequest): Promise<void> 
       throw new Error("Token manquant !");
     }
 
-    if (!groupId || !Array.isArray(groupId)) {
-      throw new Error("Liste de groupes invalide !");
+    if (!groupId || groupId.length === 0) { // Vérification améliorée
+      throw new Error("Aucun groupe sélectionné !");
     }
+
+    // Récupérer les détails du groupe pour avoir son nom
+    const group = await this.getGroupById(groupId[0]);
 
     console.log("📝 Données envoyées:", {
       userId,
-      groups: groupId,
-      url: `http://13.38.119.12/api/users/${userId}/assign_groups/`
+      group: group?.name,
+      url: `http://13.38.119.12/api/users/${userId}/assign_group/`
     });
 
-    const response = await fetch(`http://13.38.119.12/api/users/${userId}/assign_groups/`, {
+    const response = await fetch(`http://13.38.119.12/api/users/${userId}/assign_group/`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${token}`,
       },
-      body: JSON.stringify({
-        groups: groupId
-      }),
+      body: JSON.stringify({ group: group?.name }), // Vérification sécurisée avec "?"
     });
 
-    if (!response.ok) {
-      const contentType = response.headers.get("content-type");
-      let errorMessage = "Erreur lors de la mise à jour des groupes";
-      
-      if (contentType && contentType.includes("application/json")) {
-        const errorData = await response.json();
-        errorMessage = errorData.error || errorData.message || errorMessage;
-      } else {
-        errorMessage = `Erreur HTTP: ${response.status}`;
-      }
-      
-      throw new Error(errorMessage);
-    }
+    // Log de la réponse brute pour le débogage
+    console.log("📡 Réponse brute:", response);
 
     const responseData = await response.json();
-    console.log("✅ Groupes assignés avec succès:", responseData);
+    console.log("📡 Réponse détaillée:", responseData);
+
+    if (!response.ok) {
+      console.error("❌ Erreur détaillée:", responseData);
+      throw new Error(responseData.error || "Mise à jour échouée");
+    }
+
+    console.log("✅ Groupes mis à jour avec succès:", responseData);
   } catch (error: any) {
-    console.error("❌ Erreur lors de l'assignation des groupes:", error);
-    throw error;
+    console.error("❌ Erreur lors de la mise à jour des groupes:", error);
+    throw new Error(error.message || "Erreur lors de la mise à jour des groupes");
   }
 },
-
 
 // Récupérer un groupe par son ID
 async getGroupById(groupId: string): Promise<Group> {
@@ -660,6 +652,10 @@ async requestPasswordReset(email: string): Promise<void> {
     throw new Error(error.message || 'Erreur lors de la demande de réinitialisation');
   }
 },
+
+
+
+
 
 
 

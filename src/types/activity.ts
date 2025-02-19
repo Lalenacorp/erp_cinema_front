@@ -24,8 +24,7 @@ export interface SubActivity {
   subactivity_gap: string;
   created_at: string;
   updated_at: string;
-  dateDebut?: string;
-  dateFin?: string;
+
 }
 
 export interface CreateActivityRequest {
@@ -50,6 +49,5 @@ export interface UpdateSubActivityRequest {
   description?: string | null;
   amount_estimated?: string;
   amount_spent?: string;
-  dateDebut?: string;
-  dateFin?: string;
+  
 }

@@ -140,9 +140,7 @@ const NewActivityModal: React.FC<NewActivityModalProps> = ({
       newErrors.project = 'Le projet est requis';
     }
 
-    if (activity.activity_subactivity.length === 0) {
-      newErrors.subactivities = 'Au moins une sous-activité est requise';
-    }
+  
 
     if (!activity.activity_manager.trim()) {
       newErrors.activity_manager = 'Le responsable est requis';
@@ -360,44 +358,6 @@ const NewActivityModal: React.FC<NewActivityModalProps> = ({
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                   rows={2}
                 />
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <input
-                      type="date"
-                      value={newSubActivity.dateDebut}
-                      onChange={(e) => {
-                        setNewSubActivity({
-                          ...newSubActivity,
-                          dateDebut: e.target.value
-                        });
-                        setErrors(prev => ({ ...prev, dates: '' }));
-                      }}
-                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${
-                        errors.dates ? 'border-red-500' : 'border-gray-300'
-                      }`}
-                    />
-                  </div>
-                  <div>
-                    <input
-                      type="date"
-                      value={newSubActivity.dateFin}
-                      onChange={(e) => {
-                        setNewSubActivity({
-                          ...newSubActivity,
-                          dateFin: e.target.value
-                        });
-                        setErrors(prev => ({ ...prev, dates: '' }));
-                      }}
-                      className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${
-                        errors.dates ? 'border-red-500' : 'border-gray-300'
-                      }`}
-                    />
-                  </div>
-                </div>
-                {errors.dates && (
-                  <p className="mt-1 text-sm text-red-500">{errors.dates}</p>
-                )}
 
                 <button
                   type="button"

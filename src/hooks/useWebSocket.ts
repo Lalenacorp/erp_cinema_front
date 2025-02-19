@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { WebSocketService } from '../services/webSocketService';
+import { WebSocketService } from '../services/WebSocketService';
 import type { ExpenseUpdateResponse } from '../types/expense';
 
 export function useWebSocket(projectId: string, onMessage: (data: ExpenseUpdateResponse) => void) {
@@ -33,11 +33,15 @@ export function useWebSocket(projectId: string, onMessage: (data: ExpenseUpdateR
     };
   }, [projectId, onMessage]);
 
-  const updateExpense = (subactivityId: number, amountSpent: number, name: string): boolean => {
+/*   const updateExpense = (subactivityId: number, amountSpent: number, name: string): boolean => {
     if (!wsRef.current) return false;
 
     return wsRef.current.updateExpense(subactivityId, amountSpent, name);
-  };
+  }; */
+
+ 
+  
+  
 
   const deleteExpense = (expenseId: number): boolean => {
     if (!wsRef.current) return false;
@@ -46,7 +50,7 @@ export function useWebSocket(projectId: string, onMessage: (data: ExpenseUpdateR
   };
 
   return {
-    updateExpense,
+   
     deleteExpense,
     readyState,
     isConnected: readyState === WebSocket.OPEN

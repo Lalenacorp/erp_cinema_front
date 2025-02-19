@@ -22,7 +22,11 @@ function Projets() {
     setIsLoading(true);
     try {
       const data = await projectService.getProjects();
-      setProjects(data);
+      // Trier les projets du plus récent au plus ancien
+      const sortedData = data.sort((a, b) => {
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+      });
+      setProjects(sortedData);
       setError(null);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Erreur lors du chargement des projets';
@@ -32,6 +36,7 @@ function Projets() {
       setIsLoading(false);
     }
   };
+  
 
   const handleCreateProject = async (projectData: Omit<Project, 'id' | 'created_at' | 'updated_at'>) => {
     try {

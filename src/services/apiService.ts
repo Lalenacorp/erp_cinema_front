@@ -44,30 +44,7 @@ export const apiService = {
     }));
   },
 
-  async createProject(project: Omit<Project, 'id' | 'created_at' | 'updated_at'>): Promise<Project> {
-    const response = await fetch(`${this.baseUrl}/api/erp/create_project/`, {
-      method: 'POST',
-      headers: this.createHeaders(),
-      body: JSON.stringify({
-        name: project.name,
-        budget: project.budget,
-        status: project.status,
-        managed_by: project.managed_by,
-      })
-    });
-
-    if (!response.ok) {
-      throw new Error("Échec de la création du projet");
-    }
-
-    const newProject = await response.json();
-    return {
-      ...newProject,
-      budget: parseFloat(newProject.budget),
-      current_expenses: newProject.current_expenses ? parseFloat(newProject.current_expenses) : null,
-      budget_gap: newProject.budget_gap ? parseFloat(newProject.budget_gap) : null,
-    };
-  },
+ 
 
   async getProjectDetails(id: string | number): Promise<Project> {
     const response = await fetch(`${this.baseUrl}/api/erp/project/${id}/`, {
