@@ -3,10 +3,10 @@ name: Deploy ERP Front to EC2
 on:
   push:
     branches:
-      - master
+      - main  
   pull_request:
     branches:
-      - master
+      - main  
 
 jobs:
   build-and-test:
