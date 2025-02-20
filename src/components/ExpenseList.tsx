@@ -6,7 +6,7 @@ import type { Expense, ExpenseUpdateResponse } from '../types/expense';
 import type { Activity, SubActivity } from '../types/activity';
 import type { Project } from '../types/project';
 import { formatCurrency } from '../utils/formatters';
-import { Calendar, Trash2, Edit2, Activity as ActivityIcon, Layers } from 'lucide-react';
+import { Calendar, Trash2, Edit2, Activity as ActivityIcon, Layers,  FileText } from 'lucide-react';
 import CurrencyIcon from './CurrencyIcon';
 import toast from 'react-hot-toast';
 import DeleteExpenseModal from './DeleteExpenseModal';
@@ -322,7 +322,21 @@ const ExpenseList: React.FC<ExpenseListProps> = ({ projectId, onExpenseUpdate })
                                       })}
                                     </span>
                                   </div>
+                                  {expense.proof_payment && (
+                                    <div className="flex items-center gap-2 mt-2">
+                                      <a
+                                        href={expense.proof_payment}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="inline-flex items-center gap-2 px-3 py-1 text-sm text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors"
+                                      >
+                                        <FileText className="w-4 h-4" />
+                                        Voir le justificatif
+                                      </a>
+                                    </div>
+                                  )}
                                 </div>
+                                
                               </div>
                             </div>
                           </div>

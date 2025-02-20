@@ -10,7 +10,9 @@ import {
   Banknote
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { projectService } from '../services/projectService';
 import { apiService } from '../services/apiService';
+
 import type { Project, Activity } from '../types';
 import ActivityList from '../components/ActivityList';
 import NewActivityModal from '../components/NewActivityModal';

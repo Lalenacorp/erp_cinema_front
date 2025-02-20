@@ -53,14 +53,7 @@ export const activityService = {
     }
   },
 
-  async updateActivity(id: number, updateData: UpdateActivityRequest): Promise<Activity> {
-    try {
-      const { data } = await api.patch<Activity>(`/update_activity/${id}/`, updateData);
-      return data;
-    } catch (error) {
-      return handleError(error, "Failed to update activity");
-    }
-  },
+
 
   async deleteActivity(id: number): Promise<void> {
     try {

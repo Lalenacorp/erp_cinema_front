@@ -63,24 +63,32 @@ export const apiService = {
   },
 
   async updateProject(id: number, updatedData: Partial<Project>): Promise<Project> {
-    const response = await fetch(`${this.baseUrl}/api/erp/project/update_project/${id}/`, {
-      method: 'PATCH',
-      headers: this.createHeaders(),
-      body: JSON.stringify(updatedData),
-    });
-
-    if (!response.ok) {
-      throw new Error("Échec de la mise à jour du projet");
+    try {
+      const response = await fetch(`${this.baseUrl}/api/erp/update_project/${id}/`, {
+        method: 'PATCH',
+        headers: this.createHeaders(),
+        body: JSON.stringify(updatedData),
+      });
+  
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Échec de la mise à jour du projet: ${errorText}`);
+      }
+  
+      const updatedProject = await response.json();
+      return {
+        ...updatedProject,
+        name: updatedProject.name,
+        budget: parseFloat(updatedProject.budget),
+        current_expenses: updatedProject.current_expenses ? parseFloat(updatedProject.current_expenses) : null,
+        budget_gap: updatedProject.budget_gap ? parseFloat(updatedProject.budget_gap) : null,
+      };
+    } catch (error) {
+      console.error("❌ Erreur API updateProject:", error);
+      throw error;
     }
-
-    const updatedProject = await response.json();
-    return {
-      ...updatedProject,
-      budget: parseFloat(updatedProject.budget),
-      current_expenses: updatedProject.current_expenses ? parseFloat(updatedProject.current_expenses) : null,
-      budget_gap: updatedProject.budget_gap ? parseFloat(updatedProject.budget_gap) : null,
-    };
-  },
+  }
+,  
 
   async deleteProject(id: number): Promise<void> {
     const response = await fetch(`${this.baseUrl}/api/erp/delete_project/${id}/`, {
