@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { WebSocketService } from '../services/WebSocketService';
+import { WebSocketService } from '../services/webSocketService';
 import type { ExpenseUpdateResponse } from '../types/expense';
 
 export function useWebSocket(projectId: string, onMessage: (data: ExpenseUpdateResponse) => void) {
