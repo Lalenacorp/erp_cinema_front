@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
-import type { Project, ProjectStatus, UpdateProjectRequest } from '../types';
+import type { Project, ProjectStatus } from '../types';
 import toast from 'react-hot-toast';
 import { projectService } from '../services/projectService';
+import { apiService } from '../services/apiService';
 
 interface EditProjectModalProps {
   isOpen: boolean;
@@ -93,33 +94,36 @@ useEffect(() => {
     setIsSubmitting(true);
   
     try {
-      const updatedProject: UpdateProjectRequest = {
+      const updatedProject: Partial<Project> = {
+        ...project,
         name: formData.name,
-        description: formData.description || undefined, // Remplacer null par undefined
+        description: formData.description || undefined, // Évite null
         status: formData.status as ProjectStatus,
         budget: formData.budget,
         currency: formData.currency,
         exchange_rate: formData.exchange_rate,
-        started_at: formData.started_at ? new Date(formData.started_at).toISOString() : '',
-        achieved_at: formData.achieved_at ? new Date(formData.achieved_at).toISOString() : ''
+        started_at: formData.started_at ? new Date(formData.started_at).toISOString() : undefined,
+        achieved_at: formData.achieved_at ? new Date(formData.achieved_at).toISOString() : undefined,
       };
   
-      // Appel à la fonction updateProject
-      const response = await projectService.updateProject(project.id, updatedProject);
+      console.log("📤 Données envoyées à l'API:", updatedProject);
   
-      // Envoie l'objet mis à jour à l'état parent
+      // Appel API
+      const response = await apiService.updateProject(project.id, updatedProject);
+  
+      // Rafraîchissement des données après mise à jour
       onSubmit(response);
   
-      // Ferme la modale et affiche un message de succès
       onClose();
       toast.success('Projet mis à jour avec succès');
     } catch (error) {
-      console.error('Erreur lors de la mise à jour:', error);
-      toast.error('Erreur lors de la mise à jour du projet');
+      console.error('❌ Erreur lors de la mise à jour:', error);
+      toast.error(`Erreur: ${error instanceof Error ? error.message : "Impossible de mettre à jour le projet"}`);
     } finally {
       setIsSubmitting(false);
     }
   };
+  
   
   
 

@@ -5,6 +5,7 @@ import CreateGroupModal from '../components/CreateGroupModal';
 import EditGroupModal from '../components/EditGroupModal';
 import GroupDetailsModal from '../components/GroupDetailsModal';
 import toast from 'react-hot-toast';
+import { Toaster } from 'react-hot-toast';
 
 interface Group {
   id: string;
@@ -164,6 +165,7 @@ function GroupManagement() {
 
   return (
     <div className="mb-8">
+      <Toaster position="top-right" />
       <div className="flex justify-between items-center mb-6">
         <div>
           <h1 className="text-2xl font-bold mb-2">Gestion des Groupes</h1>

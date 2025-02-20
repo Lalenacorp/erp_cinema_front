@@ -135,14 +135,14 @@ const SubActivityItem: React.FC<{
         <p className="text-sm text-gray-500">{subActivity.description}</p>
         <div className="flex items-center gap-2 mt-1 text-sm text-gray-500">
           <span>Créé le {formatDate(subActivity.created_at)}</span>
-          {subActivity.dateDebut && subActivity.dateFin && (
+          {/* {subActivity.dateDebut && subActivity.dateFin && (
             <>
               <span>•</span>
               <span>
                 Du {formatDate(subActivity.dateDebut)} au {formatDate(subActivity.dateFin)}
               </span>
             </>
-          )}
+          )} */}
         </div>
       </div>
       <div className="flex items-center gap-4">

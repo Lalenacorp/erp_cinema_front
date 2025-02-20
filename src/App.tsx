@@ -18,6 +18,7 @@ import ResetPassword from './pages/ResetPassword';
 import SetPassword from './pages/SetPassword';
 import GroupManagement from './pages/GroupManagement';
 import { authService } from './services/authService';
+import { Toaster } from 'react-hot-toast';
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate();
@@ -40,10 +41,14 @@ function PrivateRoute({ children }: { children: React.ReactNode }) {
   }
 
   return (
+    
     <div className="min-h-screen bg-gray-100">
       <Sidebar />
       <div className="ml-64">
         <Header />
+        <div>
+        <Toaster position="top-right" />    
+        </div>
         <main className="p-8 mt-16">
           {children}
         </main>
