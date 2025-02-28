@@ -75,7 +75,7 @@ const ActivityHeader: React.FC<{
             <h3 className="font-medium">{activity.name}</h3>
             <p className="text-sm text-gray-500 mt-1">{activity.description}</p>
             <div className="flex items-center gap-2 mt-1 text-sm text-gray-500">
-              <span>Responsable: {activity.activity_manager}</span>
+              <span>Responsable: {activity.managed_by}</span>
               <span>•</span>
               <span>{formatDate(activity.created_at)}</span>
             </div>
@@ -129,20 +129,12 @@ const SubActivityItem: React.FC<{
   );
 
   return (
-    <div className="p-4 border-b last:border-b-0 flex items-center justify-between hover:bg-gray-100 transition-colors">
+    <div className="p-4 border-b last:border-b-0 flex items-center justify-between hover:bg-gray-100 transition-colors ml-8"> {/* Ajout de ml-8 */}
       <div>
         <h4 className="font-medium text-sm">{subActivity.name}</h4>
         <p className="text-sm text-gray-500">{subActivity.description}</p>
         <div className="flex items-center gap-2 mt-1 text-sm text-gray-500">
           <span>Créé le {formatDate(subActivity.created_at)}</span>
-          {/* {subActivity.dateDebut && subActivity.dateFin && (
-            <>
-              <span>•</span>
-              <span>
-                Du {formatDate(subActivity.dateDebut)} au {formatDate(subActivity.dateFin)}
-              </span>
-            </>
-          )} */}
         </div>
       </div>
       <div className="flex items-center gap-4">
@@ -173,6 +165,7 @@ const SubActivityItem: React.FC<{
     </div>
   );
 };
+
 
 const ActivityList: React.FC<ActivityListProps> = ({ 
   activities = [],

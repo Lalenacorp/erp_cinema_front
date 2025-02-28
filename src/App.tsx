@@ -19,6 +19,8 @@ import SetPassword from './pages/SetPassword';
 import GroupManagement from './pages/GroupManagement';
 import { authService } from './services/authService';
 import { Toaster } from 'react-hot-toast';
+import NotFound from './pages/NotFound';
+import ServerError from './pages/ServerError';
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate();
@@ -88,6 +90,10 @@ function App() {
         <Route path="/parametres" element={<PrivateRoute><Parametres /></PrivateRoute>} />
         <Route path="/profile" element={<PrivateRoute><Profile /></PrivateRoute>} />
         <Route path="/groupes" element={<PrivateRoute><GroupManagement /></PrivateRoute>} />
+
+        <Route path="*" element={<NotFound />} />
+
+        <Route path="/500" element={<ServerError />} />
         
         {/* Redirection par défaut */}
         <Route path="*" element={<Navigate to="/" replace />} />

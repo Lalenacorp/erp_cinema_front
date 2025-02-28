@@ -8,6 +8,7 @@ export interface Expense {
   created_by: number;
   proof_payment: string 
   
+  
 }
 
 export interface ExpenseUpdateResponse {

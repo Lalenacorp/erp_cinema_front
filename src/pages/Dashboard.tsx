@@ -6,6 +6,7 @@ import { authService } from '../services/authService';
 import type { Project } from '../types';
 import { formatCurrency, formatDate, formatPercentage } from '../utils/formatters';
 import toast from 'react-hot-toast';
+import ServerError from './ServerError';
 
 function Dashboard() {
   const [projects, setProjects] = useState<Project[]>([]);
@@ -20,6 +21,8 @@ function Dashboard() {
     return () => clearInterval(interval);
   }, []);
 
+  
+
   const loadData = async () => {
     try {
       setIsLoading(true);
@@ -32,6 +35,9 @@ function Dashboard() {
       setCurrentUser(userData);
       setError(null);
     } catch (err: any) {
+      if (err instanceof ServerError) {
+        throw err; // L'ErrorBoundary interceptera cette erreur
+      }
       setError(err.message || 'Erreur lors du chargement des données');
       toast.error('Erreur lors du chargement des données');
     } finally {

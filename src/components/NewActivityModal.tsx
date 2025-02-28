@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, Plus, Trash2 } from 'lucide-react';
 import type { Activity, SubActivity, Project } from '../types/index';
 import toast from 'react-hot-toast';
+import { authService } from '../services/authService';
 
 interface NewActivityModalProps {
   isOpen: boolean;
@@ -21,6 +22,9 @@ interface NewSubActivityForm extends Omit<SubActivity, 'id' | 'created_at' | 'up
   dateDebut: string;
   dateFin: string;
 }
+
+
+
 
 const initialSubActivityState: NewSubActivityForm = {
   activity: 0,
@@ -56,12 +60,15 @@ const NewActivityModal: React.FC<NewActivityModalProps> = ({
 
   const [newSubActivity, setNewSubActivity] = useState<NewSubActivityForm>(initialSubActivityState);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [users, setUsers] = useState<any[]>([]);
 
   useEffect(() => {
     if (selectedProjectId) {
       setActivity(prev => ({ ...prev, project: parseInt(selectedProjectId) }));
     }
   }, [selectedProjectId]);
+
+  
 
   const validateSubActivity = (subActivity: NewSubActivityForm): boolean => {
     const newErrors: Record<string, string> = {};
@@ -142,9 +149,8 @@ const NewActivityModal: React.FC<NewActivityModalProps> = ({
 
   
 
-    if (!activity.activity_manager.trim()) {
-      newErrors.activity_manager = 'Le responsable est requis';
-    }
+  
+    
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -152,6 +158,7 @@ const NewActivityModal: React.FC<NewActivityModalProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    console.log("Activité avant validation :", activity);
     
     if (!validateActivity()) {
       toast.error('Veuillez corriger les erreurs avant de continuer');
@@ -166,6 +173,19 @@ const NewActivityModal: React.FC<NewActivityModalProps> = ({
       toast.error("Erreur lors de la création de l'activité");
     }
   };
+
+    useEffect(() => {
+      const fetchUsers = async () => {
+        try {
+          const response = await authService.getAllUsers();
+          setUsers(response); // Directement assigner le tableau
+        } catch (error) {
+          console.error("Erreur lors du chargement des utilisateurs", error);
+        }
+      };
+    
+      fetchUsers();
+    }, []);
 
   if (!isOpen) return null;
 
@@ -246,25 +266,27 @@ const NewActivityModal: React.FC<NewActivityModalProps> = ({
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Responsable de l'activité <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="text"
-              value={activity.activity_manager}
-              onChange={(e) => {
-                setActivity({ ...activity, activity_manager: e.target.value });
-                setErrors(prev => ({ ...prev, activity_manager: '' }));
-              }}
-              className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${
-                errors.activity_manager ? 'border-red-500' : 'border-gray-300'
-              }`}
-              placeholder="Nom du responsable"
-            />
-            {errors.activity_manager && (
-              <p className="mt-1 text-sm text-red-500">{errors.activity_manager}</p>
-            )}
-          </div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Géré par <span className="text-red-500">*</span>
+          </label>
+          <select
+            value={activity.managed_by}
+            onChange={(e) => setActivity({ ...activity, managed_by: Number(e.target.value) })}
+            className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${
+              errors.managed_by ? 'border-red-500' : 'border-gray-300'
+            }`}
+          >
+            <option value="">Sélectionner un utilisateur</option>
+            {users.map((user) => (
+              <option key={user.id} value={user.id}>
+                {user.first_name} {user.last_name}
+              </option>
+            ))}
+          </select>
+          {errors.managed_by && (
+            <p className="mt-1 text-sm text-red-500">{errors.managed_by}</p>
+          )}
+        </div>
 
           <div>
             <div className="flex justify-between items-center mb-4">

@@ -1,58 +1,142 @@
-import { useState, useEffect, useRef } from 'react';
-import { WebSocketService } from '../services/webSocketService';
-import type { ExpenseUpdateResponse } from '../types/expense';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { ExpenseUpdateResponse } from '../types/expense';
+import toast from 'react-hot-toast';
 
-export function useWebSocket(projectId: string, onMessage: (data: ExpenseUpdateResponse) => void) {
-  const wsRef = useRef<WebSocketService | null>(null);
-  const [readyState, setReadyState] = useState<number>(WebSocket.CLOSED);
+export const useWebSocket = (projectId: string, onUpdate: (data: ExpenseUpdateResponse) => void) => {
+  const [isConnected, setIsConnected] = useState(false);
+  const wsRef = useRef<WebSocket | null>(null);
+  const pingIntervalRef = useRef<NodeJS.Timeout>();
+  const pingTimeoutRef = useRef<NodeJS.Timeout>();
+  const reconnectTimeoutRef = useRef<NodeJS.Timeout>();
 
-  useEffect(() => {
-    // Créer une nouvelle instance WebSocketService
-    wsRef.current = new WebSocketService(projectId);
-    
-    // Ajouter le listener de messages
-    wsRef.current.addMessageListener(onMessage);
-    
-    // Se connecter
-    wsRef.current.connect();
+  const PING_INTERVAL = 30000; // Envoyer un ping toutes les 30 secondes
+  const PING_TIMEOUT = 5000; // Attendre 5 secondes pour un pong
+  const RECONNECT_DELAY = 1000; // Tenter de se reconnecter après 1 seconde
 
-    // Mettre à jour l'état de la connexion toutes les secondes
-    const interval = setInterval(() => {
-      if (wsRef.current) {
-        setReadyState(wsRef.current.getReadyState());
-      }
-    }, 1000);
+  const connect = useCallback(() => {
+    // Nettoyer les intervalles existants
+    if (pingIntervalRef.current) clearInterval(pingIntervalRef.current);
+    if (pingTimeoutRef.current) clearTimeout(pingTimeoutRef.current);
+    if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
 
-    // Cleanup
-    return () => {
-      clearInterval(interval);
-      if (wsRef.current) {
-        wsRef.current.disconnect();
-        wsRef.current = null;
+    // Fermer la connexion existante si elle existe
+    if (wsRef.current) {
+      wsRef.current.close();
+      wsRef.current = null;
+    }
+
+    const token = localStorage.getItem('auth_token');
+    const ws = new WebSocket(`ws://13.38.119.12/ws/project/${projectId}/?token=${token}`);
+
+    const startPingInterval = () => {
+      pingIntervalRef.current = setInterval(() => {
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({ type: 'ping' }));
+          
+          // Définir un timeout pour la réponse pong
+          pingTimeoutRef.current = setTimeout(() => {
+            console.log('Pas de pong reçu, reconnexion...');
+            ws.close();
+          }, PING_TIMEOUT);
+        }
+      }, PING_INTERVAL);
+    };
+
+    ws.onopen = () => {
+      console.log('✅ WebSocket connecté');
+      setIsConnected(true);
+      startPingInterval();
+    };
+
+    ws.onclose = () => {
+      console.log('🔒 WebSocket fermé, tentative de reconnexion...');
+      setIsConnected(false);
+      
+      // Nettoyer les intervalles
+      if (pingIntervalRef.current) clearInterval(pingIntervalRef.current);
+      if (pingTimeoutRef.current) clearTimeout(pingTimeoutRef.current);
+      
+      // Tenter de se reconnecter immédiatement
+      reconnectTimeoutRef.current = setTimeout(() => {
+        console.log('🔄 Tentative de reconnexion...');
+        connect();
+      }, RECONNECT_DELAY);
+    };
+
+    ws.onerror = (error) => {
+      console.error('❌ Erreur WebSocket:', error);
+      // Ne pas fermer ici, laisser onclose gérer la reconnexion
+    };
+
+    ws.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        
+        // Gérer les messages de type pong
+        if (data.type === 'pong') {
+          if (pingTimeoutRef.current) {
+            clearTimeout(pingTimeoutRef.current);
+          }
+          return;
+        }
+
+        // Gérer les autres messages
+        onUpdate(data);
+      } catch (error) {
+        console.error('Erreur lors du traitement du message:', error);
       }
     };
-  }, [projectId, onMessage]);
 
-/*   const updateExpense = (subactivityId: number, amountSpent: number, name: string): boolean => {
-    if (!wsRef.current) return false;
+    wsRef.current = ws;
 
-    return wsRef.current.updateExpense(subactivityId, amountSpent, name);
-  }; */
+    // Garder la connexion active même si l'onglet est en arrière-plan
+    window.addEventListener('beforeunload', () => {
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.close();
+      }
+    });
 
- 
-  
-  
+    return ws;
+  }, [projectId, onUpdate]);
 
-  const deleteExpense = (expenseId: number): boolean => {
-    if (!wsRef.current) return false;
+  useEffect(() => {
+    const ws = connect();
 
-    return wsRef.current.deleteExpense(expenseId);
-  };
+    return () => {
+      // Nettoyage lors du démontage du composant
+      if (pingIntervalRef.current) clearInterval(pingIntervalRef.current);
+      if (pingTimeoutRef.current) clearTimeout(pingTimeoutRef.current);
+      if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
+      
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.close();
+      }
+    };
+  }, [connect]);
+
+  const sendMessage = useCallback((data: any) => {
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify(data));
+      return true;
+    }
+    
+    // Si la connexion est fermée, tenter de se reconnecter
+    connect();
+    toast.error('Tentative de reconnexion au serveur...');
+    return false;
+  }, [connect]);
+
+  const deleteExpense = useCallback((expenseId: number) => {
+    return sendMessage({
+      action: 'delete_expense',
+      expense_id: expenseId
+    });
+  }, [sendMessage]);
 
   return {
-   
+    isConnected,
+    sendMessage,
     deleteExpense,
-    readyState,
-    isConnected: readyState === WebSocket.OPEN
+    reconnect: connect
   };
-}
+};

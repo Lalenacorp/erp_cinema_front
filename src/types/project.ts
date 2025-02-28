@@ -5,6 +5,7 @@ export type ProjectStatus = "prepa" | "pre-prod" | "prod" | "post-prod";
 export interface Project {
   id: number;
   name: string;
+  project_manager: string,
   description: string | null;
   created_at: string;
   updated_at: string;
@@ -28,7 +29,7 @@ export interface CreateProjectRequest {
   currency: string;
   exchange_rate: string;
   managed_by: number;
-  activites: Activity[];
+
   started_at: string; // date de début
   achieved_at: string; // date de fin
 }

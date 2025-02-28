@@ -98,5 +98,8 @@ export const expenseService = {
       console.error('Erreur lors de la suppression de la dépense:', error);
       throw new Error(error.response?.data?.message || 'Impossible de supprimer la dépense');
     }
-  }
+  },
+
+
+
 };

@@ -155,6 +155,9 @@ useEffect(() => {
           </button>
         </div>
 
+        <span className="text-red-500">La devise et le taux de change ne peuvent pas être modifiés</span>
+
+
         <form onSubmit={handleSubmit} className="space-y-6">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -209,16 +212,16 @@ useEffect(() => {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Devise <span className="text-red-500">*</span>
+              <label className="block text-sm font-medium text-gray-700 mb-1 ">
+                Devise <span className="text-red-500"></span>
               </label>
               <select
                 value={formData.currency}
                 onChange={(e) => handleCurrencyChange(e.target.value)}
-                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${
+                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 bg-gray-300 ${
                   errors.currency ? 'border-red-500' : 'border-gray-300'
                 }`}
-                disabled={isSubmitting}
+                disabled
               >
                 {CURRENCIES.map(({ code, label }) => (
                   <option key={code} value={code}>
@@ -232,22 +235,22 @@ useEffect(() => {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 gap-4 ">
           <div>
 
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Taux de change <span className="text-red-500">*</span>
+              Taux de change <span className="text-red-500"></span>
             </label>
             <input
               type="number"
               value={formData.exchange_rate}
               onChange={(e) => setFormData({ ...formData, exchange_rate: e.target.value })}
-              className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${
+              className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 bg-gray-300 ${
                 errors.exchange_rate ? 'border-red-500' : 'border-gray-300'
               }`}
               min="0"
               step="0.01"
-              disabled={isSubmitting}
+              disabled
             />
             {errors.exchange_rate && (
               <p className="mt-1 text-sm text-red-500">{errors.exchange_rate}</p>

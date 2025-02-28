@@ -6,21 +6,34 @@ import type { Expense, ExpenseUpdateResponse } from '../types/expense';
 import type { Activity, SubActivity } from '../types/activity';
 import type { Project } from '../types/project';
 import { formatCurrency } from '../utils/formatters';
-import { Calendar, Trash2, Edit2, Activity as ActivityIcon, Layers,  FileText } from 'lucide-react';
+import { Calendar, Trash2, ChevronDown, ChevronRight, Activity as ActivityIcon, Layers, FileText } from 'lucide-react';
 import CurrencyIcon from './CurrencyIcon';
 import toast from 'react-hot-toast';
 import DeleteExpenseModal from './DeleteExpenseModal';
-import { useWebSocket } from '../hooks/useWebSocket';
 
 interface ExpenseListProps {
   projectId: string;
   onExpenseUpdate: (data: ExpenseUpdateResponse) => void;
-  expenses: Expense[]; 
+  expenses: Expense[];
 }
 
 interface ExpenseWithDetails extends Expense {
   activityName?: string;
   subactivityName?: string;
+}
+
+interface GroupedExpenses {
+  [activityId: string]: {
+    name: string;
+    total: number;
+    subactivities: {
+      [subactivityId: string]: {
+        name: string;
+        expenses: ExpenseWithDetails[];
+        total: number;
+      };
+    };
+  };
 }
 
 const ExpenseList: React.FC<ExpenseListProps> = ({ projectId, onExpenseUpdate }) => {
@@ -32,36 +45,76 @@ const ExpenseList: React.FC<ExpenseListProps> = ({ projectId, onExpenseUpdate })
   const [selectedExpense, setSelectedExpense] = useState<Expense | null>(null);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [expandedActivities, setExpandedActivities] = useState<Set<string>>(new Set());
+  const [expandedSubactivities, setExpandedSubactivities] = useState<Set<string>>(new Set());
 
- 
-  const { deleteExpense, isConnected } = useWebSocket(projectId, async (data) => {
-    try {
-      // Mettre à jour les données du parent
-      onExpenseUpdate(data);
-      
-      // Recharger immédiatement les dépenses
-      const [expensesData, projectData] = await Promise.all([
-        expenseService.listExpenses(projectId),
-        projectService.getProjectDetails(projectId)
-      ]);
-      
-      setExpenses(expensesData);
-      setProject(projectData);
-    } catch (error) {
-      console.error('Erreur lors de la mise à jour des dépenses:', error);
-      toast.error('Erreur lors de la mise à jour des dépenses');
-    }
-  });
+  const toggleActivity = (activityId: string) => {
+    setExpandedActivities(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(activityId)) {
+        newSet.delete(activityId);
+      } else {
+        newSet.add(activityId);
+      }
+      return newSet;
+    });
+  };
+
+  const toggleSubactivity = (subactivityId: string) => {
+    setExpandedSubactivities(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(subactivityId)) {
+        newSet.delete(subactivityId);
+      } else {
+        newSet.add(subactivityId);
+      }
+      return newSet;
+    });
+  };
+
+  const deleteExpense = async (expenseId: string | number) => {
+    const token = localStorage.getItem('auth_token');
+    const ws = new WebSocket(`ws://13.38.119.12/ws/project/${projectId}/?token=${token}`);
+  
+    return new Promise((resolve, reject) => {
+      ws.onopen = () => {
+        console.log('✅ WebSocket connecté pour suppression');
+  
+        const deleteRequest = {
+          action: 'delete_expense',
+          expense_id: expenseId.toString(),
+        };
+  
+        ws.send(JSON.stringify(deleteRequest));
+        console.log('🗑️ Requête de suppression envoyée :', deleteRequest);
+      };
+  
+      ws.onmessage = async (event) => {
+        const response = JSON.parse(event.data);
+        console.log('📩 Réponse du serveur :', response);
+        resolve(true);
+      };
+  
+      ws.onerror = (error) => {
+        console.error('❌ Erreur WebSocket :', error);
+        reject(error);
+      };
+  
+      ws.onclose = () => {
+        console.log('🔒 WebSocket fermé');
+      };
+    });
+  };
 
   const handleDeleteExpense = async () => {
-    if (!selectedExpense || !isConnected) return;
-
+    if (!selectedExpense) return;
+  
     setIsDeleting(true);
     try {
-      const success = deleteExpense(selectedExpense.id);
-      
+      const success = await deleteExpense(selectedExpense.id);
+  
       if (success) {
-        await loadData();
+        setExpenses((prevExpenses) => prevExpenses.filter(exp => exp.id !== selectedExpense.id));
         setIsDeleteModalOpen(false);
         toast.success('Dépense supprimée avec succès');
       } else {
@@ -82,8 +135,6 @@ const ExpenseList: React.FC<ExpenseListProps> = ({ projectId, onExpenseUpdate })
     }
   }, [projectId]);
 
-
-  
   const loadData = async () => {
     try {
       setIsLoading(true);
@@ -93,25 +144,21 @@ const ExpenseList: React.FC<ExpenseListProps> = ({ projectId, onExpenseUpdate })
         projectService.getProjectDetails(projectId)
       ]);
 
-      // Filtrer les activités pour ce projet
       const projectActivities = activitiesData.filter(
         activity => activity.project.toString() === projectId
       );
       setActivities(projectActivities);
       setProject(projectData);
 
-      // Enrichir les dépenses avec les noms des activités et sous-activités
       const enrichedExpenses = expensesData.map(expense => {
-        const subactivity = projectActivities
-          .flatMap(a => a.activity_subactivity)
-          .find(sa => sa.id === expense.subactivity);
-        
         const activity = projectActivities.find(a => 
           a.activity_subactivity.some(sa => sa.id === expense.subactivity)
         );
+        const subactivity = activity?.activity_subactivity.find(sa => sa.id === expense.subactivity);
 
         return {
           ...expense,
+          activityId: activity?.id,
           activityName: activity?.name,
           subactivityName: subactivity?.name
         };
@@ -143,21 +190,36 @@ const ExpenseList: React.FC<ExpenseListProps> = ({ projectId, onExpenseUpdate })
     );
   }
 
-  // Utiliser current_expenses du projet comme total des dépenses
   const totalExpenses = project?.current_expenses ? parseFloat(project.current_expenses) : 0;
   const budget = project?.budget ? parseFloat(project.budget) : 0;
   const budgetGap = budget - totalExpenses;
   const budgetUtilization = budget > 0 ? (totalExpenses / budget) * 100 : 0;
 
-  // Grouper les dépenses par activité
-  const expensesByActivity = expenses.reduce((acc, expense) => {
-    const activityName = expense.activityName || 'Autre';
-    if (!acc[activityName]) {
-      acc[activityName] = [];
+  // Grouper les dépenses par activité et sous-activité
+  const groupedExpenses = activities.reduce<GroupedExpenses>((acc, activity) => {
+    if (!acc[activity.id]) {
+      acc[activity.id] = {
+        name: activity.name,
+        total: 0,
+        subactivities: {}
+      };
     }
-    acc[activityName].push(expense);
+
+    activity.activity_subactivity.forEach(subactivity => {
+      const subactivityExpenses = expenses.filter(e => e.subactivity === subactivity.id);
+      const subactivityTotal = subactivityExpenses.reduce((sum, exp) => sum + parseFloat(exp.amount), 0);
+
+      acc[activity.id].subactivities[subactivity.id] = {
+        name: subactivity.name,
+        expenses: subactivityExpenses,
+        total: subactivityTotal
+      };
+
+      acc[activity.id].total += subactivityTotal;
+    });
+
     return acc;
-  }, {} as Record<string, ExpenseWithDetails[]>);
+  }, {});
 
   return (
     <div className="space-y-6">
@@ -236,10 +298,10 @@ const ExpenseList: React.FC<ExpenseListProps> = ({ projectId, onExpenseUpdate })
         </div>
       </div>
 
-      {/* Liste des dépenses groupées par activité */}
+      {/* Liste des dépenses groupées */}
       <div>
         <h2 className="text-xl font-semibold mb-4">Activités</h2>
-        {expenses.length === 0 ? (
+        {Object.entries(groupedExpenses).length === 0 ? (
           <div className="text-center py-12 bg-gray-50 rounded-xl">
             <CurrencyIcon 
               currency={project?.currency}
@@ -253,116 +315,151 @@ const ExpenseList: React.FC<ExpenseListProps> = ({ projectId, onExpenseUpdate })
             </p>
           </div>
         ) : (
-          <div className="space-y-6">
-          {Object.entries(expensesByActivity).map(([activityName, activityExpenses]) => {
-              const activityTotal = activityExpenses.reduce(
-                (sum, exp) => sum + parseFloat(exp.amount),
-                0
-              );
-
-              return (
-                <div key={activityName} className="bg-white rounded-xl shadow-sm overflow-hidden">
-                  <div className="p-4 bg-gray-50 border-b">
-                    <div className="flex justify-between items-center">
-                      <div className="flex items-center gap-3">
-                        <div className="bg-blue-100 p-2 rounded-lg">
-                          <ActivityIcon className="w-5 h-5 text-blue-600" />
-                        </div>
-                        <div>
-                          <h3 className="font-medium text-gray-900">{activityName}</h3>
-                          <p className="text-sm text-gray-500">
-                            {activityExpenses.length} dépense{activityExpenses.length > 1 ? 's' : ''}
-                          </p>
-                        </div>
-                      </div>
-                      <p className="text-lg font-semibold text-blue-600">
-                        {formatCurrency(activityTotal, project?.currency || 'EUR', project?.exchange_rate)}
+          <div className="space-y-4">
+            {Object.entries(groupedExpenses).map(([activityId, activity]) => (
+              <div key={activityId} className="bg-white rounded-xl shadow-sm overflow-hidden">
+                {/* En-tête de l'activité */}
+                <button
+                  onClick={() => toggleActivity(activityId)}
+                  className="w-full p-4 bg-gray-50 flex justify-between items-center hover:bg-gray-100 transition-colors"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="bg-blue-100 p-2 rounded-lg">
+                      <ActivityIcon className="w-5 h-5 text-blue-600" />
+                    </div>
+                    <div className="text-left">
+                      <h3 className="font-medium text-gray-900">{activity.name}</h3>
+                      <p className="text-sm text-gray-500">
+                        {Object.keys(activity.subactivities).length} sous-activité(s)
                       </p>
                     </div>
                   </div>
+                  <div className="flex items-center gap-4">
+                    <span className="text-lg font-semibold text-blue-600">
+                      {formatCurrency(activity.total, project?.currency || 'EUR', project?.exchange_rate)}
+                    </span>
+                    {expandedActivities.has(activityId) ? (
+                      <ChevronDown className="w-5 h-5 text-gray-500" />
+                    ) : (
+                      <ChevronRight className="w-5 h-5 text-gray-500" />
+                    )}
+                  </div>
+                </button>
 
-                  <div className="divide-y divide-gray-200">
-                    {activityExpenses.map((expense) => (
-                      <div 
-                        key={expense.id}
-                        className="p-4 hover:bg-gray-50 transition-colors"
-                      >
-                        <div className="flex justify-between items-start">
-                          <div className="flex-1">
-                            <div className="flex items-start gap-4">
-                              <div className="bg-blue-50 p-3 rounded-xl">
-                                <CurrencyIcon 
-                                  currency={project?.currency}
-                                  className="w-6 h-6 text-blue-600"
-                                />
-                              </div>
-                              <div>
-                                <h4 className="text-lg font-medium text-gray-900">
-                                  {expense.name}
-                                </h4>
-                                <p className="text-2xl font-bold text-blue-600 mt-1">
-                                  {formatCurrency(parseFloat(expense.amount), project?.currency || 'EUR', project?.exchange_rate)}
-                                </p>
-                                <div className="mt-2 space-y-1">
-                                  {expense.subactivityName && (
-                                    <div className="flex items-center gap-2 text-sm text-gray-600">
-                                      <Layers className="w-4 h-4" />
-                                      <span>Sous-activité : {expense.subactivityName}</span>
-                                    </div>
-                                  )}
-                                  <div className="flex items-center gap-2 text-sm text-gray-500">
-                                    <Calendar className="w-4 h-4" />
-                                    <span>
-                                      {new Date(expense.created_at).toLocaleDateString('fr-FR', {
-                                        day: 'numeric',
-                                        month: 'long',
-                                        year: 'numeric',
-                                        hour: '2-digit',
-                                        minute: '2-digit'
-                                      })}
-                                    </span>
-                                  </div>
-                                  {expense.proof_payment && (
-                                    <div className="flex items-center gap-2 mt-2">
-                                      <a
-                                        href={expense.proof_payment}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="inline-flex items-center gap-2 px-3 py-1 text-sm text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors"
-                                      >
-                                        <FileText className="w-4 h-4" />
-                                        Voir le justificatif
-                                      </a>
-                                    </div>
-                                  )}
-                                </div>
-                                
-                              </div>
+                {/* Liste des sous-activités */}
+                {expandedActivities.has(activityId) && (
+                  <div className="divide-y divide-gray-100">
+                    {Object.entries(activity.subactivities).map(([subactivityId, subactivity]) => (
+                      <div key={subactivityId} className="bg-white border-l-4 border-blue-100 ml-4">
+                        <button
+                          onClick={() => toggleSubactivity(subactivityId)}
+                          className="w-full p-4 flex justify-between items-center hover:bg-gray-50 transition-colors"
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="bg-gray-100 p-2 rounded-lg">
+                              <Layers className="w-5 h-5 text-gray-600" />
+                            </div>
+                            <div className="text-left">
+                              <h4 className="font-medium text-gray-800">{subactivity.name}</h4>
+                              <p className="text-sm text-gray-500">
+                                {subactivity.expenses.length} dépense(s)
+                              </p>
                             </div>
                           </div>
-
-                          <div className="flex gap-2">
-                            <button
-                              onClick={() => {
-                                setSelectedExpense(expense);
-                                setIsDeleteModalOpen(true);
-                              }}
-                              className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                              title="Supprimer la dépense"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
+                          <div className="flex items-center gap-4">
+                            <span className="text-lg font-semibold text-gray-700">
+                              {formatCurrency(subactivity.total, project?.currency || 'EUR', project?.exchange_rate)}
+                            </span>
+                            {expandedSubactivities.has(subactivityId) ? (
+                              <ChevronDown className="w-5 h-5 text-gray-500" />
+                            ) : (
+                              <ChevronRight className="w-5 h-5 text-gray-500" />
+                            )}
                           </div>
-                        </div>
+                        </button>
+
+                        {/* Liste des dépenses */}
+                        {expandedSubactivities.has(subactivityId) && (
+                          <div className="bg-gray-50 divide-y divide-gray-100 border-l-4 border-gray-100 ml-8">
+                            {subactivity.expenses.map((expense) => (
+                              <div 
+                                key={expense.id}
+                                className="p-4 hover:bg-gray-100 transition-colors"
+                              >
+                                <div className="flex justify-between items-start">
+                                  <div className="flex-1">
+                                    <div className="flex items-start gap-4">
+                                      <div className="bg-blue-50 p-3 rounded-xl">
+                                        <CurrencyIcon 
+                                          currency={project?.currency}
+                                          className="w-6 h-6 text-blue-600"
+                                        />
+                                      </div>
+                                      <div>
+                                        <h4 className="text-lg font-medium text-gray-900">
+                                          {expense.name}
+                                        </h4>
+                                        <p className="text-2xl font-bold text-blue-600 mt-1">
+                                          {formatCurrency(parseFloat(expense.amount), project?.currency || 'EUR', project?.exchange_rate)}
+                                        </p>
+                                        <div className="mt-2 space-y-1">
+                                          <div className="flex items-center gap-2 text-sm text-gray-500">
+                                            <Calendar className="w-4 h-4" />
+                                            <span>
+                                              {new Date(expense.created_at).toLocaleDateString('fr-FR', {
+                                                day: 'numeric',
+                                                month: 'long',
+                                                year: 'numeric',
+                                                hour: '2-digit',
+                                                minute: '2-digit'
+                                              })}
+                                            </span>
+                                          </div>
+                                          {expense.proof_payment && (
+                                            <div className="flex items-center gap-2 mt-2">
+                                              <a
+                                                href={expense.proof_payment}
+                                                target="_blank"
+                                                rel="noopener noreferrer"
+                                                className="inline-flex items-center gap-2 px-3 py-1 text-sm text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors"
+                                              >
+                                                <FileText className="w-4 h-4" />
+                                                Voir le justificatif
+                                              </a>
+                                            </div>
+                                          )}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </div>
+
+                                  <div className="flex gap-2">
+                                    <button
+                                      onClick={() => {
+                                        setSelectedExpense(expense);
+                                        setIsDeleteModalOpen(true);
+                                      }}
+                                      className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                      title="Supprimer la dépense"
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                    </button>
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>
-                </div>
-              );
-            })}
+                )}
+              </div>
+            ))}
           </div>
         )}
       </div>
+
       {selectedExpense && (
         <DeleteExpenseModal
           isOpen={isDeleteModalOpen}
@@ -383,4 +480,4 @@ const ExpenseList: React.FC<ExpenseListProps> = ({ projectId, onExpenseUpdate })
 
 export default ExpenseList;
 
-export { ExpenseList }
+export { ExpenseList };

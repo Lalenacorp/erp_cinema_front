@@ -1,7 +1,7 @@
 import { authService } from './authService';
 import toast from 'react-hot-toast';
 
-export class WebSocketService {
+export class webSocketService {
   private socket: WebSocket | null = null;
   private reconnectAttempts = 0;
   private maxReconnectAttempts = 5;

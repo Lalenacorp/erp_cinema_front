@@ -8,7 +8,7 @@ import {
   Pencil,
   Trash2,
   Banknote
-} from 'lucide-react';
+} from 'lucide-react'; 
 import toast from 'react-hot-toast';
 import { projectService } from '../services/projectService';
 import { apiService } from '../services/apiService';
@@ -73,6 +73,8 @@ function ProjectDetails() {
   const [isEditProjectModalOpen, setIsEditProjectModalOpen] = useState(false);
   const [isDeleteProjectModalOpen, setIsDeleteProjectModalOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  
 
   const loadProjectData = useCallback(async () => {
     if (!id) return;
@@ -299,7 +301,7 @@ const handleProjectUpdate = async (updatedProject: Project) => {
             <StatCard
               icon={Users}
               title="Responsable"
-              value={project.managed_by || 'Non assigné'}
+              value={project.project_manager || 'Non assigné'}
               bgColor="bg-yellow-50"
               iconColor="bg-yellow-100 text-yellow-600"
             />

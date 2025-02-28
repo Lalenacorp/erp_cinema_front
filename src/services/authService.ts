@@ -441,10 +441,10 @@ async assignUserGroups({ userId, groupId }: AssignGroupsRequest): Promise<void> 
     console.log("📝 Données envoyées:", {
       userId,
       groups: groupId,
-      url: `http://13.38.119.12/api/users/${userId}/assign_groups/`
+      url: `http://13.38.119.12/api/users/${userId}/assign_group/`
     });
 
-    const response = await fetch(`http://13.38.119.12/api/users/${userId}/assign_groups/`, {
+    const response = await fetch(`http://13.38.119.12/api/users/${userId}/assign_group/`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

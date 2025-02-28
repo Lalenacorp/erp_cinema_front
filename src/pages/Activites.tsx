@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Plus, Search, Filter, Calendar, Users, Briefcase, AlertTriangle } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Plus, Search, Filter,  } from 'lucide-react';
 import ActivityList from '../components/ActivityList';
 import NewActivityModal from '../components/NewActivityModal';
 import type { Activity, Project } from '../types';
@@ -95,9 +95,7 @@ function Activites() {
 
   // Statistiques
   const totalActivities = filteredActivities.length;
-  const completedActivities = filteredActivities.filter(a => a.status === 'Terminée').length;
-  const inProgressActivities = filteredActivities.filter(a => a.status === 'En cours').length;
-  const pendingActivities = filteredActivities.filter(a => a.status === 'En attente').length;
+  
 
   return (
     <div className="space-y-8">

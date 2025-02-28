@@ -13,16 +13,16 @@ function Projets() {
   const [searchQuery, setSearchQuery] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [refreshKey, setRefreshKey] = useState(0); // Ajout d'une clé de rafraîchissement
 
   useEffect(() => {
     loadProjects();
-  }, []);
+  }, [refreshKey]); // Dépendance à refreshKey pour forcer le rechargement
 
   const loadProjects = async () => {
     setIsLoading(true);
     try {
       const data = await projectService.getProjects();
-      // Trier les projets du plus récent au plus ancien
       const sortedData = data.sort((a, b) => {
         return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
       });
@@ -36,25 +36,33 @@ function Projets() {
       setIsLoading(false);
     }
   };
-  
 
   const handleCreateProject = async (projectData: Omit<Project, 'id' | 'created_at' | 'updated_at'>) => {
     try {
-      // Convert budget string to number for the API request
       const budgetNumber = parseFloat(projectData.budget);
       
       if (isNaN(budgetNumber)) {
         throw new Error('Le budget doit être un nombre valide');
       }
-
-      await projectService.createProject({
+  
+      // Préparer les données à envoyer à l'API
+      const formattedData = {
         name: projectData.name,
-        budget: budgetNumber, // Now passing a number instead of a string
+        description: projectData.description || '', // Assurez-vous de passer une description, même vide si nécessaire
+        budget: budgetNumber.toString(),  // Convertir le budget en string
+        currency: projectData.currency || 'Euro',  // Exemple de valeur par défaut
+        exchange_rate: projectData.exchange_rate || '1',  // Exemple de valeur par défaut
         status: projectData.status || 'prepa',
-        managed_by: projectData.managed_by
-      });
-      
-      await loadProjects();
+        managed_by: projectData.managed_by,
+        started_at: projectData.started_at,
+        achieved_at: projectData.achieved_at,
+        
+      };
+  
+      // Appel au service API pour créer le projet
+      await projectService.createProject(formattedData);
+  
+      setRefreshKey(prevKey => prevKey + 1);  // Incrémenter la clé pour forcer le rechargement
       setIsNewProjectModalOpen(false);
       toast.success('Projet créé avec succès');
     } catch (err) {
@@ -62,6 +70,7 @@ function Projets() {
       toast.error(errorMessage);
     }
   };
+  
 
   const getStatusColor = (status: string) => {
     switch (status) {
